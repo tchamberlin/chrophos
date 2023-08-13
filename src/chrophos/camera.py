@@ -78,6 +78,11 @@ class CameraConfig:
     def config(self):
         return {p.name: p.value for p in self.parameters.values()}
 
+    def set_value(self, key, value):
+        config = self._camera.get_config()
+        config.get_child_by_name(key).set_value(value)
+        self._camera.set_config(config)
+
     def pull_config(self):
         camera_config = self._camera.get_config()
         for p in self.parameters.values():
@@ -95,9 +100,11 @@ class CameraConfig:
 class FancyCamera:
     def __init__(self, aperture_range: tuple[int, int], iso_range: tuple[int, int] = (100, 1600)):
         self._camera = gp.Camera()
+
         self.config = CameraConfig(
             camera=self._camera, aperture_range=aperture_range, iso_range=iso_range
         )
+        self.config.set_value("imagequality", "NEF (Raw)")
         self.light_meter = self.config.light_meter
         self.iso = self.config.iso
         self.aperture = self.config.aperture
