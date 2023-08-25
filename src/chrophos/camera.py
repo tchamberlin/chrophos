@@ -24,34 +24,49 @@ def check_is_number_or_fraction(fraction: str):
 
 def parse_aperture(aperture: str):
     try:
+        return float(aperture)
+    except ValueError:
+        pass
+
+    try:
         return float(aperture.split("/")[1])
     except IndexError:
         raise IndexError(f"Invalid aperture: {aperture!r}")
 
 
-class CameraConfig:
-    def __init__(self, camera: gp.Camera, shutter_range=None, aperture_range=None, iso_range=None):
+class CameraManager:
+    def __init__(
+        self,
+        camera: gp.Camera,
+        config_map: dict[str, str],
+        shutter_range=None,
+        aperture_range=None,
+        iso_range=None,
+    ):
         self._camera = camera
         camera_config = self._camera.get_config()
 
-        shutter = camera_config.get_child_by_name("shutterspeed2")
+        shutter = camera_config.get_child_by_name(config_map["shutter"])
         self.parameters = {}
         self.shutter = DiscreteParameter(
             "shutter",
-            "shutterspeed2",
-            valid_values=[c for c in shutter.get_choices() if check_is_number_or_fraction(c)],
+            config_map["shutter"],
+            valid_values=[
+                c for c in shutter.get_choices() if check_is_number_or_fraction(c)
+            ],
             initial_value=shutter.get_value(),
         )
         self.parameters["shutter"] = self.shutter
 
-        aperture = camera_config.get_child_by_name("f-number")
+        aperture = camera_config.get_child_by_name(config_map["aperture"])
         self.aperture = DiscreteParameter(
             "aperture",
-            "f-number",
+            config_map["aperture"],
             valid_values=[
                 c
                 for c in aperture.get_choices()
-                if aperture_range[0] <= parse_aperture(c) <= aperture_range[1]
+                if aperture_range
+                and (aperture_range[0] <= parse_aperture(c) <= aperture_range[1])
             ],
             initial_value=aperture.get_value(),
         )
@@ -60,18 +75,26 @@ class CameraConfig:
         iso = camera_config.get_child_by_name("iso")
         self.iso = DiscreteParameter(
             "iso",
-            "iso",
-            valid_values=[v for v in iso.get_choices() if iso_range[0] <= int(v) <= iso_range[1]],
+            config_map["iso"],
+            valid_values=[
+                v
+                for v in iso.get_choices()
+                if v.isnumeric()
+                and iso_range
+                and (iso_range[0] <= int(v) <= iso_range[1])
+            ],
             initial_value=iso.get_value(),
         )
         self.parameters["iso"] = self.iso
 
-        light_meter = camera_config.get_child_by_name("lightmeter")
-        self.light_meter = ReadonlyParameter(
-            "light_meter", "lightmeter", initial_value=light_meter.get_value()
-        )
-        self.parameters["light_meter"] = self.light_meter
-
+        if "light_meter" in config_map:
+            light_meter = camera_config.get_child_by_name("lightmeter")
+            self.light_meter = ReadonlyParameter(
+                "light_meter", "lightmeter", initial_value=light_meter.get_value()
+            )
+            self.parameters["light_meter"] = self.light_meter
+        else:
+            self.light_meter = None
         self.pull_config()
 
     @property
@@ -98,13 +121,22 @@ class CameraConfig:
 
 
 class FancyCamera:
-    def __init__(self, aperture_range: tuple[int, int], iso_range: tuple[int, int] = (100, 1600)):
+    def __init__(
+        self,
+        config_map: dict[str, str],
+        aperture_range: tuple[int, int],
+        iso_range: tuple[int, int] = (100, 1600),
+    ):
         self._camera = gp.Camera()
 
-        self.config = CameraConfig(
-            camera=self._camera, aperture_range=aperture_range, iso_range=iso_range
+        self.config = CameraManager(
+            camera=self._camera,
+            config_map=config_map,
+            aperture_range=aperture_range,
+            iso_range=iso_range,
         )
-        self.config.set_value("imagequality", "NEF (Raw)")
+        # TODO: This is only needed for nikon
+        # self.config.set_value("imagequality", "NEF (Raw)")
         self.light_meter = self.config.light_meter
         self.iso = self.config.iso
         self.aperture = self.config.aperture
@@ -166,22 +198,26 @@ class FancyCamera:
             result.extend(self.list_files(os.path.join(path, name)))
         return result
 
-    def capture_and_export(self, output_path: Path):
-        path = self._camera.capture(gp.GP_CAPTURE_IMAGE)
-        print(f"Captured to {path.folder + path.name}")
-        camera_file = self._camera.file_get(path.folder, path.name, gp.GP_FILE_TYPE_NORMAL)
+    def capture_and_export(self, output_dir: Path, stem: str):
+        _path = self._camera.capture(gp.GP_CAPTURE_IMAGE)
+        path_on_camera = Path(_path.folder + _path.name)
+        print(f"Captured to {path_on_camera}")
+        camera_file = self._camera.file_get(
+            _path.folder, _path.name, gp.GP_FILE_TYPE_NORMAL
+        )
         capture_dt = datetime.fromtimestamp(camera_file.get_mtime())
+        output_path = output_dir / f"{stem}{path_on_camera.suffix}"
         camera_file.save(str(output_path))
-        return capture_dt
+        return capture_dt, output_path
 
     def exit(self):
         return self._camera.exit()
 
 
 @contextmanager
-def open_camera(*args, **kwargs):
+def open_camera(config_map: dict[str, str], *args, **kwargs):
     try:
-        camera = FancyCamera(*args, **kwargs)
+        camera = FancyCamera(config_map, *args, **kwargs)
         yield camera
     except Exception:
         raise
