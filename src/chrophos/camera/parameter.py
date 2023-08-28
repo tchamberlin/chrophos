@@ -8,8 +8,6 @@ class ValidationError(ValueError):
 
 
 class Parameter:
-    """"""
-
     def __init__(self, name: str, field: str, initial_value: Any = None):
         self.name = name
         self.field = field
@@ -46,7 +44,7 @@ class RangeParameter(Parameter):
         self.valid_range = valid_range
         self.valid_range = valid_range
         self.lower_bound, self.upper_bound = valid_range
-        super().__init__(name=name, field=field, *args, **kwargs)
+        super().__init__(*args, name=name, field=field, **kwargs)
 
     # def get_value(self):
     #     pass
@@ -62,7 +60,7 @@ class RangeParameter(Parameter):
 class DiscreteParameter(Parameter):
     def __init__(self, name: str, field: str, valid_values: list[Any], *args, **kwargs):
         self.valid_values = valid_values
-        super().__init__(name=name, field=field, *args, **kwargs)
+        super().__init__(*args, name=name, field=field, **kwargs)
 
     def step_value(self, step: int):
         current_index = self.valid_values.index(self.value)

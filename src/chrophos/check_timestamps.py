@@ -1,6 +1,5 @@
 import argparse
-from time import sleep
-from datetime import timedelta, datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import numpy as np

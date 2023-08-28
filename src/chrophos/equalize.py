@@ -4,12 +4,8 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 import rawpy
-from skimage import exposure
 from skimage.color import rgb2gray
 from skimage.util import img_as_float
-from skimage.morphology import disk
-from skimage.morphology import ball
-from skimage.filters import rank
 
 from chrophos.exposure import equalize
 
@@ -34,32 +30,6 @@ def auto_exposure(raw, target_mean=128):
     exposure_compensation = np.log2(current_mean / target_mean)
 
     return exposure_compensation
-
-
-def foo(path: Path):
-    for p in sorted(path.glob("*.NEF")):
-        raw: rawpy._rawpy.RawPy = rawpy.imread(str(p))
-        rgb: np.ndarray = raw.postprocess()
-        r, g, b = rgb.T
-        mean_luma = 0.299 * r + 0.587 * g + 0.144 * b
-        breakpoint()
-        gray = rgb2gray(rgb)
-        original_mean_intensity = get_average_intensity(gray)
-        equalized_image = equalize(gray)
-        equalized_mean_intensity = equalized_image.mean()
-
-        direction = "under" if equalized_mean_intensity > original_mean_intensity else "over"
-        print(
-            f"{p.name}:"
-            f" {equalized_mean_intensity - original_mean_intensity=:.2f} ({direction}-exposed) "
-        )
-
-
-def plot_image_and_hist(ax_image, ax_hist, image, hist):
-    # Display image
-    ax_image.imshow(image)
-
-    ax_hist.hist(mean_luma.ravel(), bins=256, histtype="step")
 
 
 if __name__ == "__main__":

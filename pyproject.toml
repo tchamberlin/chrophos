@@ -42,18 +42,36 @@ select = [
   "F",    # https://beta.ruff.rs/docs/rules/#pyflakes-f
   "E",    # https://beta.ruff.rs/docs/rules/#error-e
   "W",    # https://beta.ruff.rs/docs/rules/#warning-w
+  "D",    # https://beta.ruff.rs/docs/rules/#pydocstyle-d
   "B",    # https://beta.ruff.rs/docs/rules/#flake8-bugbear-b
   "I",    # https://beta.ruff.rs/docs/rules/#isort-i
   "NPY",  # https://beta.ruff.rs/docs/rules/#numpy-specific-rules-npy
   "PD",   # https://beta.ruff.rs/docs/rules/#pandas-vet-pd
   "RUF",  # https://beta.ruff.rs/docs/rules/#ruff-specific-rules-ruf
+  "UP",   # https://beta.ruff.rs/docs/rules/#pyupgrade-up
+  "TRY",  # https://beta.ruff.rs/docs/rules/#tryceratops-try
+#  "ERA",  # https://beta.ruff.rs/docs/rules/#eradicate-era
 ]
 fixable = ["ALL"]
-unfixable = ["B"]
+unfixable = ["B", "F401"]
 ignore = [
-  "E741",  # ambiguous-variable-name
+  "E741",   # ambiguous-variable-name
+  "D100",   # Missing docstring in public module
+  "D101",   # Missing docstring in public class
+  "D102",   # Missing docstring in public method
+  "D103",   # Missing docstring in public function
+  "D104",   # Missing docstring in public package
+  "D105",   # Missing docstring in magic method
+  "D106",   # Missing docstring in public nested class
+  "D107",   # Missing docstring in `__init__`
+  "TRY003", # Abstract `raise` to an inner function
+  "TRY301", # Abstract `raise` to an inner function
+  "TRY301", # Avoid specifying long messages outside the exception class
 ]
 line-length = 100
+
+[tool.ruff.pydocstyle]
+convention = "google"
 
 [tool.pyright]
 reportImplicitStringConcatenation = false

@@ -1,6 +1,6 @@
 from datetime import timedelta
 
-from chrophos.plan import summary, output_summary
+from chrophos.plan import output_summary, summary
 
 
 def test_summary():

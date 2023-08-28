@@ -3,8 +3,6 @@ from contextlib import contextmanager
 from pathlib import Path
 from time import sleep
 
-import math
-
 from chrophos.camera.backend import Backend
 from chrophos.camera.parameter import ValidationError
 from chrophos.config import Config

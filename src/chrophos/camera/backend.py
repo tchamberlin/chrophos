@@ -7,18 +7,18 @@ from time import sleep
 
 import gphoto2 as gp
 
-from .parameter import DiscreteParameter, ReadonlyParameter
 from ..config import Complex
+from .parameter import DiscreteParameter, ReadonlyParameter
 
 logger = logging.getLogger(__name__)
 
 
 class BackendError(ValueError):
-    """Indicates an error in the camera itself"""
+    """Indicates an error in the camera itself."""
 
 
 class Backend(ABC):
-    """An abstraction of a physical camera"""
+    """An abstraction of a physical camera."""
 
     aperture: DiscreteParameter
     iso: DiscreteParameter
@@ -36,40 +36,6 @@ class Backend(ABC):
     @abstractmethod
     def exit(self):
         ...
-
-
-# class DummyBackend(Backend):
-#     def __init__(self, config_map: dict[str, str]):
-#         self.parameters = {}
-#         self.shutter = DiscreteParameter(
-#             "shutter",
-#             config_map.get("shutter", "shutter"),
-#             valid_values=["30", "10", "6", "4", "2", "1", "1/4", "1/10", "1/25", "1/100", "1/1000"],
-#             initial_value="1/1000",
-#         )
-#         self.parameters["shutter"] = self.shutter
-#
-#         self.aperture = DiscreteParameter(
-#             "aperture",
-#             config_map.get("aperture", "aperture"),
-#             valid_values=["2", "2.8", "4", "5.6", "8", "11", "16", "22"],
-#             initial_value="8",
-#         )
-#         self.parameters["aperture"] = self.aperture
-#
-#         self.iso = DiscreteParameter(
-#             "iso",
-#             config_map.get("iso", "iso"),
-#             valid_values=["100", "200", "400", "1000", "1600", "3200", "6400", "12800"],
-#             initial_value="100",
-#         )
-#         self.parameters["iso"] = self.iso
-#
-#     def capture_and_download(self, output_dir: Path, stem: str) -> Path:
-#         ...
-#
-#     def exit(self):
-#         ...
 
 
 class Gphoto2Backend(Backend):

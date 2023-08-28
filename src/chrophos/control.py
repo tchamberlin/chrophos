@@ -82,7 +82,7 @@ def auto_adjust_exposure(
                 param = camera.shutter
                 step = 1
             else:
-                raise AssertionError("shit")
+                raise AssertionError(f"Unexpected {auto_exposure_mode=}")
             param.step_value(step)
         except ValidationError as error:
             logger.info(f"Ran out of {param.name} stops: {error}")

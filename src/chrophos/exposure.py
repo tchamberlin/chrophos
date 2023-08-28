@@ -1,17 +1,11 @@
-from typing import Callable, Any
-
-import numpy as np
-import matplotlib
 import math
+from typing import Any, Callable
+
 import matplotlib.pyplot as plt
+import numpy as np
 import rawpy
-
-from skimage import img_as_float
+from skimage import exposure, img_as_float
 from skimage.util import img_as_ubyte
-
-
-from skimage import exposure
-
 
 EQUALIZATION_METHODS: dict[str, Callable[[Any], Any]] = {"global": exposure.equalize_hist}
 

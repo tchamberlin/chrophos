@@ -6,8 +6,7 @@ def format_timedelta(td: timedelta):
 
 
 def summary(input_frames: int, input_interval: timedelta, output_fps: float):
-    """
-    If I take 100 pictures at a 5-second interval, that means it covers 100 * 5 seconds
+    """If I take 100 pictures at a 5-second interval, that means it covers 100 * 5 seconds.
 
     If I play those 100 images back at 30fps, it will take 100 / 30 seconds
 
@@ -31,15 +30,6 @@ def summary(input_frames: int, input_interval: timedelta, output_fps: float):
 
 
 def output_summary(input_span: timedelta, output_span: timedelta, output_fps: float):
-    """
-    If you want a timelapse video of `output_span` length, played back at `output_fps` fps, then you need to capture
-    x images at y interval
-    :param input_span:
-    :param output_span:
-    :param output_fps:
-    :return:
-    """
-
     input_frames = output_span.total_seconds() * output_fps
     input_interval = timedelta(seconds=input_span.total_seconds() / input_frames)
     speedup = input_span.total_seconds() / output_span.total_seconds()
