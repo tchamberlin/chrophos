@@ -1,25 +1,36 @@
-from numbers import Number
-
 from abc import abstractmethod
-
+from numbers import Number
 from typing import Any
+
+
+class ValidationError(ValueError):
+    ...
 
 
 class Parameter:
     """"""
 
-    def __init__(self, name: str, field: str, initial_value: Any):
+    def __init__(self, name: str, field: str, initial_value: Any = None):
         self.name = name
         self.field = field
-        self.value = initial_value
+        self._value = initial_value
         self.validate()
 
     def __str__(self):
-        return self.name
+        return f"{self.name}: {self.value}"
 
     @abstractmethod
     def validate(self):
         pass
+
+    @property
+    def value(self):
+        return self._value
+
+    @value.setter
+    def value(self, value):
+        self._value = value
+        self.validate()
 
 
 class ReadonlyParameter(Parameter):
@@ -28,10 +39,6 @@ class ReadonlyParameter(Parameter):
 
     def validate(self):
         pass
-
-
-class ValidationError(ValueError):
-    """"""
 
 
 class RangeParameter(Parameter):
@@ -47,7 +54,8 @@ class RangeParameter(Parameter):
     def validate(self):
         if not (self.lower_bound <= self.value <= self.upper_bound):
             raise ValidationError(
-                f"{self.value} is not within valid range [{self.lower_bound}, {self.upper_bound}]"
+                f"{self.field} {self.value} is not within valid range [{self.lower_bound},"
+                f" {self.upper_bound}]"
             )
 
 
@@ -56,7 +64,7 @@ class DiscreteParameter(Parameter):
         self.valid_values = valid_values
         super().__init__(name=name, field=field, *args, **kwargs)
 
-    def step_value(self, step=1):
+    def step_value(self, step: int):
         current_index = self.valid_values.index(self.value)
         if step == 0:
             return self.value
@@ -65,7 +73,7 @@ class DiscreteParameter(Parameter):
             new_value = self.valid_values[current_index + step]
             self.value = new_value
         else:
-            raise IndexError(f"Can't step value by {step}!")
+            raise ValidationError(f"Can't step value by {step}!")
         return self.value
 
     def increment(self, step=1):
@@ -76,4 +84,6 @@ class DiscreteParameter(Parameter):
 
     def validate(self):
         if self.value not in self.valid_values:
-            raise ValidationError(f"{self.value} is not in valid values {self.valid_values}")
+            raise ValidationError(
+                f"{self.field} value {self.value!r} is not in valid values {self.valid_values}"
+            )

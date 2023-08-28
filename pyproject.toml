@@ -7,6 +7,10 @@ authors = [
 ]
 dependencies = [
     "gphoto2>=2.3.6",
+    "scikit-image>=0.21.0",
+    "rawpy>=0.18.1",
+    "matplotlib>=3.7.2",
+    "deepdiff>=6.3.1",
 ]
 requires-python = ">=3.9"
 readme = "README.md"
@@ -29,47 +33,27 @@ dev = [
 ]
 
 
-[tool.ruff]
-# Enable the pycodestyle (`E`) and Pyflakes (`F`) rules by default.
-# Unlike Flake8, Ruff doesn't enable pycodestyle warnings (`W`) or
-# McCabe complexity (`C901`) by default.
-select = ["E", "F"]
-ignore = []
-
-# Allow autofix for all enabled rules (when `--fix`) is provided.
-fixable = ["ALL"]
-unfixable = []
-
-# Exclude a variety of commonly ignored directories.
-exclude = [
-    ".bzr",
-    ".direnv",
-    ".eggs",
-    ".git",
-    ".git-rewrite",
-    ".hg",
-    ".mypy_cache",
-    ".nox",
-    ".pants.d",
-    ".pytype",
-    ".ruff_cache",
-    ".svn",
-    ".tox",
-    ".venv",
-    "__pypackages__",
-    "_build",
-    "buck-out",
-    "build",
-    "dist",
-    "node_modules",
-    "venv",
-]
-
-# Same as Black.
+[tool.black]
+preview = true
 line-length = 100
 
-# Allow unused variables when underscore-prefixed.
-dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
+[tool.ruff]
+select = [
+  "F",    # https://beta.ruff.rs/docs/rules/#pyflakes-f
+  "E",    # https://beta.ruff.rs/docs/rules/#error-e
+  "W",    # https://beta.ruff.rs/docs/rules/#warning-w
+  "B",    # https://beta.ruff.rs/docs/rules/#flake8-bugbear-b
+  "I",    # https://beta.ruff.rs/docs/rules/#isort-i
+  "NPY",  # https://beta.ruff.rs/docs/rules/#numpy-specific-rules-npy
+  "PD",   # https://beta.ruff.rs/docs/rules/#pandas-vet-pd
+  "RUF",  # https://beta.ruff.rs/docs/rules/#ruff-specific-rules-ruf
+]
+fixable = ["ALL"]
+unfixable = ["B"]
+ignore = [
+  "E741",  # ambiguous-variable-name
+]
+line-length = 100
 
-# Assume Python 3.8
-target-version = "py311"
+[tool.pyright]
+reportImplicitStringConcatenation = false

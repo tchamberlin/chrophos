@@ -1,0 +1,26 @@
+target_iso = "100"
+target_aperture = "8"
+target_shutter = "1/100"
+aperture_min = 2
+aperture_max = 16
+iso_min = 100
+iso_max = 6400
+mode = "aperture_priority"
+
+[config_map]
+shutter = "shutterspeed"
+aperture = "aperture"
+iso = "iso"
+
+[config_map.shutter_release]
+key = "eosremoterelease"
+values.full_press = "Press Full"
+values.half_press = "Press Half"
+values.half_release = "Release Half"
+
+[config_map.auto_exposure_mode]
+key = "autoexposuremode"
+values.manual = "Manual"
+values.aperture_priority = "AV"
+values.shutter_priority = "TV"
+values.program = "P"
