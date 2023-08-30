@@ -5,7 +5,9 @@ import typer
 app = typer.Typer()
 
 
-def format_timedelta(td: timedelta):
+def format_timedelta(td: timedelta, threshold=timedelta(seconds=60)):
+    if td < threshold:
+        return f"{td.total_seconds():,}s"
     return f"{td} ({td.total_seconds():,} seconds)"
 
 

@@ -8,6 +8,7 @@ from time import sleep
 import gphoto2 as gp
 
 from ..config import Complex
+from ..utilities.benchmark import Benchmark
 from .parameter import DiscreteParameter, Parameter, ReadonlyParameter, ValidationError
 
 logger = logging.getLogger(__name__)
@@ -230,16 +231,18 @@ class Gphoto2Backend(Backend):
         logger.debug("Pushed config to camera")
 
     def capture_and_download(self, output_dir: Path, stem: str):
-        logger.debug(f"Attempting to capture to {output_dir=} with stem {stem!r}")
+        logger.debug(f"Attempting to capture to {output_dir!s} with stem {stem!r}")
         output_dir.mkdir(parents=True, exist_ok=True)
-        _path = self._camera.capture(gp.GP_CAPTURE_IMAGE)
+        with Benchmark("Captured image", logger=logger.debug):
+            _path = self._camera.capture(gp.GP_CAPTURE_IMAGE)
         path_on_camera = Path(_path.folder + _path.name)
         logger.info(f"Captured to camera path {path_on_camera}")
         camera_file = self._camera.file_get(_path.folder, _path.name, gp.GP_FILE_TYPE_NORMAL)
         capture_dt = datetime.fromtimestamp(camera_file.get_mtime())
 
         output_path = output_dir / f"{stem}{path_on_camera.suffix}"
-        camera_file.save(str(output_path))
+        with Benchmark(f"Downloaded image from camera to {output_path}", logger=logger.debug):
+            camera_file.save(str(output_path))
         logger.info(f"Capture to {output_path} completed at {capture_dt}")
         return output_path, capture_dt
 

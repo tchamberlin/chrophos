@@ -1,5 +1,6 @@
 import decimal
 from dataclasses import dataclass
+from datetime import timedelta
 from pathlib import Path
 from typing import Any
 
@@ -34,6 +35,7 @@ class Config:
     iso_min: ISO
     iso_max: ISO
     config_map: dict[str, str | Complex]
+    dark_time: timedelta
 
 
 def parse_config_raw(path: Path):
@@ -59,4 +61,5 @@ def parse_config(path: Path):
         iso_min=config["iso_min"],
         iso_max=config["iso_max"],
         config_map={k: parse_param(v) for k, v in config["config_map"].items()},
+        dark_time=timedelta(seconds=config["dark_time"]),
     )

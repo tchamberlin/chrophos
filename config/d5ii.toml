@@ -6,6 +6,7 @@ aperture_max = 16
 iso_min = 100
 iso_max = 6400
 mode = "aperture_priority"
+dark_time = 5
 
 [config_map]
 shutter = "shutterspeed"

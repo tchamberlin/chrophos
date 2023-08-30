@@ -8,7 +8,7 @@ from time import sleep
 import typer
 
 from chrophos.camera.backend import Backend
-from chrophos.camera.camera import Camera, ExposureTriangle, open_camera
+from chrophos.camera.camera import Camera, open_camera
 from chrophos.config import Config
 from chrophos.plan import format_timedelta
 
@@ -44,8 +44,8 @@ def sleep_until(dt: datetime, precision=0.01):
         delta = dt - now
         if delta <= ZERO_DELTA:
             logger.debug(
-                f"Done sleeping at {now} (missed target {dt} by"
-                f" {timedelta(seconds=abs(delta.total_seconds()))})"
+                "Done sleeping. Missed target by"
+                f" {format_timedelta(timedelta(seconds=abs(delta.total_seconds())))}"
             )
             return delta
         else:
@@ -83,12 +83,16 @@ def timelapse(
     num_frames: int | None,
     interval: timedelta,
     output_dir: Path,
-    dark_time=timedelta(seconds=1),
-    start_delay=timedelta(seconds=0),
-    window_size=5,
+    dark_time: timedelta | None = None,
+    start_delay=timedelta(seconds=1),
     dry_run=False,
-    ev_diff_threshold_steps=1.0,
 ):
+    if dark_time is None:
+        dark_time = config.dark_time
+
+    if dark_time is None:
+        raise AssertionError("shit")
+
     if interval < dark_time:
         raise ValueError(
             f"Requested interval of {interval} is longer than expected dark time of {dark_time}"
@@ -98,47 +102,19 @@ def timelapse(
     start = datetime.now() + start_delay
     times = gen_times(interval, num_frames, start)
     template = "TL{i}"
-    previous_exposures: list[ExposureTriangle] = []
-    ev_at_last_intervention: float | None = None
     camera: Camera
     with open_camera(backend=backend, config=config) as camera:
         for i, commanded_capture_time in enumerate(times, 1):
-            camera.backend.pull_config()
-            if camera.backend.auto_exposure_mode.value != "Manual":
-                raise AssertionError("Uh oh")
-            logger.debug(camera.summary())
+            summary = camera.summary()
+            logger.debug(summary)
             shutter_speed = timedelta(seconds=camera.shutter.actual_value)
             total_shot_time = shutter_speed + dark_time
-            buffer = interval - total_shot_time
-            current_exposure = camera.determine_good_exposure()
-            if ev_at_last_intervention is None:
-                ev_at_last_intervention = current_exposure.ev
-            previous_exposures = [current_exposure, *previous_exposures[: window_size - 1]]
-            logger.info(f"{[e.ev for e in previous_exposures]}")
-            mean_ev = sum(e.ev for e in previous_exposures) / len(previous_exposures)
-            logger.info(current_exposure.description())
-            diff_between_commanded_ev_and_avg_detected_ev = camera.exposure.ev - mean_ev
-            logger.info(f"Current Commanded Exposure: {camera.summary()}")
-            # logger.info(
-            #     f"Current EV {current_exposure.ev:.1f} | Rolling Avg. EV: {mean_ev:.1f} |"
-            #     f" {diff_between_commanded_ev_and_avg_detected_ev=:.1f} |
-            #     {ev_diff_threshold_steps=:.1f} |"
-            #     f" {ev_at_last_intervention=:.1f}"
-            # )
-            if abs(abs(mean_ev) - abs(camera.exposure.ev)) >= ev_diff_threshold_steps:
-                logger.info(
-                    f"Stepping exposure by {diff_between_commanded_ev_and_avg_detected_ev} stops;"
-                    " stepping exposure"
-                )
-                camera.step_exposure(diff_between_commanded_ev_and_avg_detected_ev)
-                previous_exposures = [camera.exposure] * window_size
-                ev_at_last_intervention = camera.exposure.ev
+            buffer = total_shot_time - interval
             logger.debug(
                 f"Required shot time: {format_timedelta(shutter_speed)} +"
                 f" {format_timedelta(dark_time)} = {format_timedelta(total_shot_time)}. This"
                 f" is {format_timedelta(buffer)} less than the interval"
             )
-
             now = datetime.now()
             if commanded_capture_time < now:
                 raise ValueError(f"Missed capture window #{i} by {now - commanded_capture_time}")
@@ -148,13 +124,14 @@ def timelapse(
                 output_path, actual_capture_time = camera.capture_and_download(
                     output_dir, stem=template.format(i=i)
                 )
-                print(
+                logger.info(
                     f"Saved #{i} to PC at {output_path}. Delta:"
                     f" {actual_capture_time - commanded_capture_time}"
                 )
                 end_time = time.perf_counter()
+                actual_dark_time = timedelta(
+                    seconds=end_time - start_time - shutter_speed.total_seconds()
+                )
                 logger.debug(
-                    "Actual dark time:"
-                    f" {end_time - start_time - shutter_speed.total_seconds():.2f}s (vs. estimated"
-                    f" dark time {dark_time}"
+                    f"Actual dark time: {actual_dark_time} (vs. estimated dark time {dark_time})"
                 )
