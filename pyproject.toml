@@ -7,11 +7,12 @@ authors = [
 ]
 dependencies = [
     "gphoto2>=2.3.6",
-    "scikit-image>=0.21.0",
     "rawpy>=0.18.1",
     "matplotlib>=3.7.2",
     "deepdiff>=6.3.1",
     "typer>=0.9.0",
+    "ipython>=8.14.0",
+    "tomlkit>=0.12.1",
 ]
 requires-python = ">=3.9"
 readme = "README.md"
@@ -25,8 +26,10 @@ requires = ["pdm-backend"]
 build-backend = "pdm.backend"
 
 [tool.pdm.dev-dependencies]
+image = [
+    "scikit-image>=0.21.0",
+]
 dev = [
-    "ipython>=8.14.0",
     "ipdb>=0.13.13",
     "pytest>=7.4.0",
     "jupyterlab>=4.0.4",

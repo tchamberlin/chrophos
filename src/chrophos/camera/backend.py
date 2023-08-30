@@ -4,6 +4,7 @@ from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
 from time import sleep
+from typing import Union
 
 import gphoto2 as gp
 
@@ -59,7 +60,7 @@ class Backend(ABC):
     aperture: Aperture
     iso: ISO
     shutter: Shutter
-    light_meter: ReadonlyParameter | None
+    light_meter: Union[ReadonlyParameter, None]
 
     @abstractmethod
     def __init__(self, config_map: dict[str, str]):
@@ -77,7 +78,7 @@ class Backend(ABC):
 class Gphoto2Backend(Backend):
     def __init__(
         self,
-        config_map: dict[str, str | Complex],
+        config_map: dict[str, Union[str, Complex]],
         target_shutter: float,
         target_aperture: float,
         target_iso: int,
@@ -206,7 +207,7 @@ class Gphoto2Backend(Backend):
             p.value = camera_config.get_child_by_name(p.field).get_value()
         logger.debug("Pulled config from camera")
 
-    def push_config(self, bulk=True, params: list[Parameter] | None = None, attempts=2):
+    def push_config(self, bulk=True, params: Union[list[Parameter], None] = None, attempts=2):
         camera_config = self._camera.get_config()
         if params is None:
             params = self.parameters.values()

@@ -4,6 +4,7 @@ import time
 from datetime import datetime, timedelta
 from pathlib import Path
 from time import sleep
+from typing import Union
 
 import typer
 
@@ -65,7 +66,9 @@ def get_nearest_shutter_under(camera: Camera, value):
     raise ValueError("fuck")
 
 
-def gen_times(interval: timedelta, num_frames: int | None = None, start: datetime | None = None):
+def gen_times(
+    interval: timedelta, num_frames: Union[int, None] = None, start: Union[datetime, None] = None
+):
     if start is None:
         start = datetime.now()
     if num_frames is None:
@@ -80,10 +83,10 @@ def gen_times(interval: timedelta, num_frames: int | None = None, start: datetim
 def timelapse(
     backend: Backend,
     config: Config,
-    num_frames: int | None,
+    num_frames: Union[int, None],
     interval: timedelta,
     output_dir: Path,
-    dark_time: timedelta | None = None,
+    dark_time: Union[timedelta, None] = None,
     start_delay=timedelta(seconds=1),
     dry_run=False,
 ):

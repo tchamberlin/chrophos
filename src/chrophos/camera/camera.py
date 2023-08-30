@@ -1,4 +1,3 @@
-import enum
 import logging
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -37,11 +36,12 @@ class ExposureTriangle:
 
 
 class Camera:
-    class MODE(enum.StrEnum):
-        PROGRAM = enum.auto()
-        APERTURE_PRIORITY = enum.auto()
-        SHUTTER_PRIORITY = enum.auto()
-        MANUAL = enum.auto()
+    @dataclass
+    class MODE:
+        PROGRAM = "program"
+        APERTURE_PRIORITY = "APERTURE_PRIORITY"
+        SHUTTER_PRIORITY = "SHUTTER_PRIORITY"
+        MANUAL = "MANUAL"
 
     def __init__(
         self,

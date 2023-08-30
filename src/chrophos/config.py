@@ -1,10 +1,9 @@
-import decimal
 from dataclasses import dataclass
 from datetime import timedelta
 from pathlib import Path
-from typing import Any
+from typing import Any, Union
 
-import tomllib
+import tomlkit
 
 
 class Aperture(float):
@@ -34,16 +33,16 @@ class Config:
     aperture_max: Aperture
     iso_min: ISO
     iso_max: ISO
-    config_map: dict[str, str | Complex]
+    config_map: dict[str, Union[str, Complex]]
     dark_time: timedelta
 
 
 def parse_config_raw(path: Path):
     with open(path, "rb") as file:
-        return tomllib.load(file, parse_float=decimal.Decimal)
+        return tomlkit.load(file)
 
 
-def parse_param(param: str | dict[str, Any]):
+def parse_param(param: Union[str, dict[str, Any]]):
     if isinstance(param, str):
         return param
 
