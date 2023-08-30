@@ -1,5 +1,7 @@
+import enum
 import logging
 from contextlib import contextmanager
+from dataclasses import dataclass
 from pathlib import Path
 from time import sleep
 
@@ -15,53 +17,39 @@ class CameraError(ValueError):
     ...
 
 
-def check_is_number_or_fraction(fraction: str):
-    try:
-        int(fraction)
-    except Exception:
-        try:
-            numerator, denominator = fraction.split("/")
-            _ = int(numerator), int(denominator)
-        except Exception:
-            return False
+@dataclass
+class ExposureTriangle:
+    shutter: float
+    aperture: float
+    iso: int
 
-    return True
+    @property
+    def exposure_value(self):
+        return exposure_value(shutter=self.shutter, aperture=self.aperture, iso=self.iso)
 
+    ev = exposure_value
 
-def parse_shutter(shutter: str):
-    if shutter == "auto":
-        return None
-    try:
-        return float(shutter)
-    except ValueError:
-        pass
-
-    try:
-        numerator, denominator = shutter.split("/")
-        return float(numerator) / float(denominator)
-    except (ValueError, IndexError) as error:
-        raise ValidationError(f"Invalid shutter value {shutter!r}") from error
-
-
-def parse_aperture(aperture: str):
-    try:
-        return float(aperture)
-    except ValueError:
-        pass
-
-    try:
-        return float(aperture.split("/")[1])
-    except IndexError as error:
-        raise CameraError(f"Invalid aperture: {aperture!r}") from error
+    def description(self):
+        return (
+            f"Shutter {self.shutter}, Aperture {self.aperture}, ISO {self.iso}, EV"
+            f" {self.exposure_value:.1f}"
+        )
 
 
 class Camera:
+    class MODE(enum.StrEnum):
+        PROGRAM = enum.auto()
+        APERTURE_PRIORITY = enum.auto()
+        SHUTTER_PRIORITY = enum.auto()
+        MANUAL = enum.auto()
+
     def __init__(
         self,
         backend: Backend,
         config: Config,
     ):
         self.backend = backend
+        self.config = config
         # TODO: This is only needed for nikon
         # self.config.set_value("imagequality", "NEF (Raw)")
 
@@ -71,24 +59,87 @@ class Camera:
         self.aperture = self.backend.aperture
         self.shutter = self.backend.shutter
 
-    def exposure_value(self):
-        iso = int(self.iso.value)
-        aperture = parse_aperture(self.aperture.value)
-        shutter = parse_shutter(self.shutter.value)
-        return exposure_value(aperture=aperture, iso=iso, shutter=shutter)
+    @property
+    def exposure(self):
+        iso = self.iso.actual_value
+        aperture = self.aperture.actual_value
+        shutter = self.shutter.actual_value
+        return ExposureTriangle(aperture=aperture, iso=iso, shutter=shutter)
 
-    def step_exposure(self, step: int):
-        # self.backend.pull_config()
+    # TODO: Step size is configurable in camera; need to make sure these are synced up
+    # TODO: This really needs to be a feedback loop where it checks the results along the way
+    def step_exposure(self, stop: int, step_size=1 / 3):
+        if step_size < 0:
+            raise ValueError("Doesn't work like that; must always be positive step size")
+        if stop == 0:
+            raise ValueError("Can't step by 0, dumbass")
+        total_steps = int(stop // step_size)
+        logger.warning(
+            f"Stepping exposure by {stop:.1f} stops (in {total_steps} steps of {step_size})"
+        )
         parameter_order = [self.shutter, self.aperture, self.iso]
+        steps_remaining = total_steps
+        if stop < 0:
+            parameter_order = reversed(parameter_order)
         for parameter in parameter_order:
-            try:
-                parameter.step_value(step)
-            except IndexError:
-                print(f"Can't step value for {parameter}; moving on to next parameter")
-            else:
-                # self.backend.push_config()
-                return True
-        return False
+            for i in range(steps_remaining):
+                logger.info(f"Step {i}, param {parameter.name}")
+                previous_value = parameter.actual_value
+                try:
+                    parameter.step_value(-1 if stop < 0 else 1)
+                except ValidationError:
+                    logger.info(f"Can't step value for {parameter}; moving on to next parameter")
+                    break
+                else:
+                    steps_remaining -= 1
+                    self.backend.push_config([parameter])
+                    logger.warning(
+                        f"Stepped {parameter.name} from {previous_value} to"
+                        f" {parameter.actual_value}. EV: {self.exposure.ev:.1f}; {steps_remaining=}"
+                    )
+                    if steps_remaining == 0:
+                        return True
+        raise ValueError("Failed to step exposure!")
+
+    def determine_good_exposure(self, mode=MODE.PROGRAM):
+        inv = {v: k for k, v in self.config.config_map["auto_exposure_mode"].values.items()}
+        original_mode = inv[self.backend.auto_exposure_mode.value]
+        self.switch_mode(mode)
+        with self.backend.half_press_shutter_during():
+            exposure_triangle = ExposureTriangle(
+                iso=self.iso.parse(self.backend.get_config_value(self.iso.field)),
+                aperture=self.aperture.parse(self.backend.get_config_value(self.aperture.field)),
+                shutter=self.shutter.parse(self.backend.get_config_value(self.shutter.field)),
+            )
+
+        self.switch_mode(original_mode)
+        logger.debug(exposure_triangle.description())
+        return exposure_triangle
+
+    # def auto_expose(self):
+    #     original_values = self.get_exposure_triangle()
+    #     new_values = self.get_exposure_triangle()
+    #
+
+    def set_program_mode(self):
+        self.switch_mode(self.MODE.PROGRAM)
+
+    def set_aperture_priority_mode(self):
+        return self.switch_mode(self.MODE.APERTURE_PRIORITY)
+
+    def set_shutter_priority_mode(self):
+        return self.switch_mode(self.MODE.SHUTTER_PRIORITY)
+
+    def set_manual_mode(self):
+        return self.switch_mode(self.MODE.MANUAL)
+
+    def switch_mode(self, mode: MODE):
+        logger.debug(f"Command: switch mode to {mode}")
+        aem = self.config.config_map["auto_exposure_mode"]
+        if isinstance(aem, str):
+            raise ValueError("config issue")
+        self.backend.auto_exposure_mode.value = aem.values[mode]
+        self.backend.push_config(params=[self.backend.auto_exposure_mode], bulk=False)
 
     def auto_expose_via_light_meter(self, target_bounds=(-5, 5), delay=0.05):
         if not self.light_meter:
@@ -128,11 +179,7 @@ class Camera:
         return self.backend.capture_and_download(output_dir, stem)
 
     def summary(self):
-        return self.backend.summary()
-        # return (
-        #     f"Shutter: {self.shutter.value}; Aperture: {self.aperture.value}; ISO:"
-        #     f" {self.iso.value}; EV: {self.exposure_value():.1f}"
-        # )
+        return self.exposure.description()
 
 
 @contextmanager

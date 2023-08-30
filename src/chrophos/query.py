@@ -4,6 +4,9 @@ from pathlib import Path
 from queue import Queue
 
 import gphoto2 as gp
+import typer
+
+app = typer.Typer()
 
 
 def bfs(start_node):
@@ -48,6 +51,7 @@ def parse_args():
     return parser.parse_args()
 
 
+@app.command()
 def main():
     args = parse_args()
     camera = gp.Camera()

@@ -8,9 +8,44 @@ from time import sleep
 import gphoto2 as gp
 
 from ..config import Complex
-from .parameter import DiscreteParameter, ReadonlyParameter
+from .parameter import DiscreteParameter, Parameter, ReadonlyParameter, ValidationError
 
 logger = logging.getLogger(__name__)
+
+
+class Aperture(DiscreteParameter):
+    def parse(self, aperture: str):
+        try:
+            return float(aperture)
+        except ValueError:
+            pass
+
+        try:
+            return float(aperture.split("/")[1])
+        except IndexError as error:
+            raise ValidationError(f"Invalid aperture: {aperture!r}") from error
+
+
+class Shutter(DiscreteParameter):
+    def parse(self, shutter: str):
+        try:
+            return float(shutter)
+        except ValueError:
+            pass
+
+        try:
+            numerator, denominator = shutter.split("/")
+            return float(numerator) / float(denominator)
+        except (ValueError, IndexError) as error:
+            raise ValidationError(f"Invalid shutter value {shutter!r}") from error
+
+
+class ISO(DiscreteParameter):
+    def parse(self, value: str):
+        try:
+            return int(value)
+        except ValueError as error:
+            raise ValidationError(f"Invalid iso value {value!r}") from error
 
 
 class BackendError(ValueError):
@@ -20,9 +55,9 @@ class BackendError(ValueError):
 class Backend(ABC):
     """An abstraction of a physical camera."""
 
-    aperture: DiscreteParameter
-    iso: DiscreteParameter
-    shutter: DiscreteParameter
+    aperture: Aperture
+    iso: ISO
+    shutter: Shutter
     light_meter: ReadonlyParameter | None
 
     @abstractmethod
@@ -42,9 +77,9 @@ class Gphoto2Backend(Backend):
     def __init__(
         self,
         config_map: dict[str, str | Complex],
-        target_shutter: str,
-        target_aperture: str,
-        target_iso: str,
+        target_shutter: float,
+        target_aperture: float,
+        target_iso: int,
         reset_camera_config_on_exit=False,
         half_press_on_init=False,
     ):
@@ -55,6 +90,10 @@ class Gphoto2Backend(Backend):
                 "Failed to initialize camera. Are you sure it's plugged in and turned on?"
             ) from error
 
+        self.target_shutter = target_shutter
+
+        self.target_aperture = target_aperture
+        self.target_iso = target_iso
         self.pre_init_camera()
         camera_config = self._camera.get_config()
 
@@ -63,38 +102,30 @@ class Gphoto2Backend(Backend):
 
         shutter = camera_config.get_child_by_name(config_map["shutter"])
         self.parameters = {}
-        self.shutter = DiscreteParameter(
+        self.shutter = Shutter(
             "shutter",
             config_map["shutter"],
-            valid_values=[*shutter.get_choices(), "auto"],
-            initial_value=target_shutter,
+            choices=list(shutter.get_choices()),
+            initial_value=shutter.get_value(),
         )
         self.parameters["shutter"] = self.shutter
 
-        shutter_release = camera_config.get_child_by_name(config_map["shutter_release"].key)
-        self.shutter_release = DiscreteParameter(
-            "shutter_release",
-            config_map["shutter_release"].key,
-            valid_values=list(shutter_release.get_choices()),
-            initial_value=shutter_release.get_value(),
-        )
-        self.parameters["shutter_release"] = self.shutter_release
-
         aperture = camera_config.get_child_by_name(config_map["aperture"])
-        self.aperture = DiscreteParameter(
+        self.aperture = Aperture(
             "aperture",
             config_map["aperture"],
-            valid_values=[*aperture.get_choices(), "implicit auto"],
-            initial_value=target_aperture,
+            choices=list(aperture.get_choices()),
+            initial_value=aperture.get_value(),
         )
         self.parameters["aperture"] = self.aperture
 
         iso = camera_config.get_child_by_name("iso")
-        self.iso = DiscreteParameter(
+        self.iso = ISO(
             "iso",
             config_map["iso"],
-            valid_values=[*iso.get_choices(), "Auto"],
-            initial_value=target_iso,
+            # TODO: Don't reverse this; need to properly sort!
+            choices=list(iso.get_choices()),
+            initial_value=iso.get_value(),
         )
         self.parameters["iso"] = self.iso
         if "light_meter" in config_map:
@@ -106,6 +137,23 @@ class Gphoto2Backend(Backend):
         else:
             self.light_meter = None
 
+        shutter_release = camera_config.get_child_by_name(config_map["shutter_release"].key)
+        self.shutter_release = DiscreteParameter(
+            "shutter_release",
+            config_map["shutter_release"].key,
+            choices=list(shutter_release.get_choices()),
+            initial_value=shutter_release.get_value(),
+        )
+        self.parameters["shutter_release"] = self.shutter_release
+
+        auto_exposure_mode = camera_config.get_child_by_name(config_map["auto_exposure_mode"].key)
+        self.auto_exposure_mode = DiscreteParameter(
+            "auto_exposure_mode",
+            config_map["auto_exposure_mode"].key,
+            choices=list(auto_exposure_mode.get_choices()),
+            initial_value=auto_exposure_mode.get_value(),
+        )
+        self.parameters["auto_exposure_mode"] = self.auto_exposure_mode
         # Push config to camera
         self.push_config()
         # Perform any post-init tasks that need to be performed
@@ -126,14 +174,30 @@ class Gphoto2Backend(Backend):
     def post_init_camera(self):
         pass
 
-    def get_config_value(self, key):
-        config = self._camera.get_config()
-        return config.get_child_by_name(key).get_value()
+    def get_config_value(self, key, attempts=2):
+        for i in range(1, attempts + 1):
+            logger.debug(f"Attempt #{i} to get {key}")
+            try:
+                config = self._camera.get_config()
+                return config.get_child_by_name(key).get_value()
+            except gp.GPhoto2Error as error:
+                if i == attempts:
+                    raise
+                else:
+                    logger.debug(f"{error}; trying again")
 
-    def set_config_value(self, key, value):
-        config = self._camera.get_config()
-        config.get_child_by_name(key).set_value(value)
-        self._camera.set_config(config)
+    def set_config_value(self, key, value, attempts=2):
+        for i in range(1, attempts + 1):
+            logger.debug(f"Attempt #{i} to set {key} to {value}")
+            try:
+                config = self._camera.get_config()
+                config.get_child_by_name(key).set_value(value)
+                return self._camera.set_config(config)
+            except gp.GPhoto2Error as error:
+                if i == attempts:
+                    raise
+                else:
+                    logger.debug(f"{error}; trying again")
 
     def pull_config(self):
         camera_config = self._camera.get_config()
@@ -141,7 +205,7 @@ class Gphoto2Backend(Backend):
             p.value = camera_config.get_child_by_name(p.field).get_value()
         logger.debug("Pulled config from camera")
 
-    def push_config(self, bulk=True, params=None):
+    def push_config(self, bulk=True, params: list[Parameter] | None = None, attempts=2):
         camera_config = self._camera.get_config()
         if params is None:
             params = self.parameters.values()
@@ -155,10 +219,18 @@ class Gphoto2Backend(Backend):
                 self.set_config_value(p.field, p.value)
                 logger.debug(f"Successfully set {p.field} to {p.value}")
         if bulk:
-            self._camera.set_config(camera_config)
+            for i in range(attempts + 1, 1):
+                try:
+                    self._camera.set_config(camera_config)
+                except gp.GPhoto2Error as error:
+                    if i == attempts:
+                        raise
+                    else:
+                        logger.debug(f"{error}; trying again")
         logger.debug("Pushed config to camera")
 
     def capture_and_download(self, output_dir: Path, stem: str):
+        logger.debug(f"Attempting to capture to {output_dir=} with stem {stem!r}")
         output_dir.mkdir(parents=True, exist_ok=True)
         _path = self._camera.capture(gp.GP_CAPTURE_IMAGE)
         path_on_camera = Path(_path.folder + _path.name)
@@ -198,9 +270,7 @@ class Canon5DII(Gphoto2Backend):
     def half_press_shutter_during(self):
         camera_config = self._camera.get_config()
         self.half_press_shutter(camera_config)
-        logger.debug("PRESS")
         try:
-            logger.debug("YIELD")
             yield
         finally:
             self.half_release_shutter(camera_config)
@@ -209,17 +279,17 @@ class Canon5DII(Gphoto2Backend):
         if camera_config is None:
             camera_config = self._camera.get_config()
         shutter_release = camera_config.get_child_by_name("eosremoterelease")
-        logger.debug("Half-pressing shutter")
         shutter_release.set_value("Press Half")
         self._camera.set_config(camera_config)
+        logger.debug("Half-pressed shutter")
         sleep(delay)
 
     def half_release_shutter(self, camera_config=None, delay=0.2):
         if camera_config is None:
             camera_config = self._camera.get_config()
-            logger.debug("Half-releasing shutter")
         shutter_release = camera_config.get_child_by_name("eosremoterelease")
         shutter_release.set_value("Release Half")
+        logger.debug("Half-released shutter")
         self._camera.set_config(camera_config)
         sleep(delay)
 
@@ -233,17 +303,4 @@ class Canon5DII(Gphoto2Backend):
             "Setting camera to 'Manual' mode (so that available exposure settings can be read)"
         )
         self.set_config_value("autoexposuremode", "Manual")
-
-    def post_init_camera(self):
-        logger.info(
-            "Setting camera to 'P' mode (so that the camera can control its own exposure settings)"
-        )
-        self.set_config_value("autoexposuremode", "P")
-
-    def push_config(self, bulk=False):
-        if self.get_config_value("autoexposuremode") == "AV":
-            super().push_config(params=[self.aperture], bulk=bulk)
-        elif self.get_config_value("autoexposuremode") == "TV":
-            super().push_config(params=[self.shutter], bulk=bulk)
-        else:
-            super().push_config(bulk=bulk)
+        self.set_config_value("meteringmode", "Evaluative")

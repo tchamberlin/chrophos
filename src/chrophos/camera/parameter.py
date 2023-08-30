@@ -30,6 +30,10 @@ class Parameter:
         self._value = value
         self.validate()
 
+    @abstractmethod
+    def parse(self, value: str):
+        ...
+
 
 class ReadonlyParameter(Parameter):
     def __init__(self, *args, **kwargs):
@@ -58,18 +62,19 @@ class RangeParameter(Parameter):
 
 
 class DiscreteParameter(Parameter):
-    def __init__(self, name: str, field: str, valid_values: list[Any], *args, **kwargs):
-        self.valid_values = valid_values
+    def __init__(self, name: str, field: str, choices: list[Any], *args, **kwargs):
+        self.choices = choices
         super().__init__(*args, name=name, field=field, **kwargs)
 
     def step_value(self, step: int):
-        current_index = self.valid_values.index(self.value)
+        current_index = self.choices.index(self.value)
         if step == 0:
             return self.value
 
-        if 0 <= self.valid_values.index(self.value) + step < len(self.valid_values):
-            new_value = self.valid_values[current_index + step]
+        if 0 <= self.choices.index(self.value) + step < len(self.choices):
+            new_value = self.choices[current_index + step]
             self.value = new_value
+            self.validate()
         else:
             raise ValidationError(f"Can't step value by {step}!")
         return self.value
@@ -81,7 +86,14 @@ class DiscreteParameter(Parameter):
         return self.step_value(step)
 
     def validate(self):
-        if self.value not in self.valid_values:
+        if self.value not in self.choices:
             raise ValidationError(
-                f"{self.field} value {self.value!r} is not in valid values {self.valid_values}"
+                f"{self.field} value {self.value!r} is not in valid values {self.choices}"
             )
+
+    def parse(self, value):
+        ...
+
+    @property
+    def actual_value(self):
+        return self.parse(self.value)
