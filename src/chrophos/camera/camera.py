@@ -1,4 +1,5 @@
 import logging
+import math
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
@@ -7,13 +8,16 @@ from time import sleep
 from chrophos.camera.backend import Backend
 from chrophos.camera.parameter import ValidationError
 from chrophos.config import Config
-from chrophos.exposure import exposure_value
 
 logger = logging.getLogger(__name__)
 
 
 class CameraError(ValueError):
     ...
+
+
+def exposure_value(aperture: float, iso: int, shutter: float):
+    return
 
 
 @dataclass
@@ -24,7 +28,7 @@ class ExposureTriangle:
 
     @property
     def exposure_value(self):
-        return exposure_value(shutter=self.shutter, aperture=self.aperture, iso=self.iso)
+        return math.log2((100 * self.aperture**2) / (self.iso * self.shutter))
 
     ev = exposure_value
 

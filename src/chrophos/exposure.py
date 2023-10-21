@@ -1,4 +1,3 @@
-import math
 from typing import Any, Callable
 
 import matplotlib.pyplot as plt
@@ -10,9 +9,7 @@ from skimage.util import img_as_ubyte
 EQUALIZATION_METHODS: dict[str, Callable[[Any], Any]] = {"global": exposure.equalize_hist}
 
 
-def exposure_value(aperture: float, iso: int, shutter: float):
-    return math.log2((100 * aperture**2) / (iso * shutter))
-    # return math.log2(aperture)
+# return math.log2(aperture)
 
 
 def plot_img_and_hist(image, axes, bins=256):

@@ -1,10 +1,11 @@
-target_iso = "100"
-target_aperture = "8"
-target_shutter = "1/100"
+camera_model = "Canon EOS 5D Mark II"
+shutter_min = "1/8000"
+shutter_max = "30"
 aperture_min = 2
-aperture_max = 16
+# As per https://www.dxomark.com/Lenses/Canon/Canon-EF-100mm-F2-USM-mounted-on-Canon-EOS-5D-Mark-II---Measurements__483
+aperture_max = 11
 iso_min = 100
-iso_max = 6400
+iso_max = 6400  # As per https://www.photonstophotos.net/Charts/PDR_Shadow.htm
 mode = "aperture_priority"
 dark_time = 5
 

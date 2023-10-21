@@ -1,4 +1,3 @@
-import argparse
 import logging
 import time
 from datetime import datetime, timedelta
@@ -16,23 +15,6 @@ from chrophos.plan import format_timedelta
 logger = logging.getLogger(__name__)
 
 app = typer.Typer()
-
-
-def parse_args():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("-c", "--config", type=Path)
-    parser.add_argument("-s")
-    parser.add_argument(
-        "-o",
-        "--output",
-        dest="output_dir",
-        type=Path,
-        default=Path("./raw_timelapse_images"),
-    )
-    parser.add_argument("-i", "--interval", type=int, required=True)
-    parser.add_argument("-n", "--num-images", type=int, required=True)
-    parser.add_argument("-v", "--verbosity", type=int, choices=[0, 1, 2], default=1)
-    return parser.parse_args()
 
 
 ZERO_DELTA = timedelta(0)
@@ -86,6 +68,7 @@ def timelapse(
     num_frames: Union[int, None],
     interval: timedelta,
     output_dir: Path,
+    mode: str = "P",
     dark_time: Union[timedelta, None] = None,
     start_delay=timedelta(seconds=1),
     dry_run=False,
@@ -107,10 +90,14 @@ def timelapse(
     template = "TL{i}"
     camera: Camera
     with open_camera(backend=backend, config=config) as camera:
+        camera.backend.set_config_value("autoexposuremode", mode)
+        # with camera.backend.half_press_shutter_during():
+        #     summary = camera.summary()
+        #     sleep(0.5)
+        # logger.info(f"Current camera exposure state: {summary}")
         for i, commanded_capture_time in enumerate(times, 1):
-            summary = camera.summary()
-            logger.debug(summary)
-            shutter_speed = timedelta(seconds=camera.shutter.actual_value)
+            with camera.backend.half_press_shutter_during():
+                shutter_speed = timedelta(seconds=camera.shutter.actual_value)
             total_shot_time = shutter_speed + dark_time
             buffer = total_shot_time - interval
             logger.debug(

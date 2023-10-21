@@ -67,8 +67,9 @@ def shell():
 @app.command()
 def timelapse(
     interval: int,
+    mode: Annotated[str, typer.Option("-m", "--mode")],
     num_frames: Optional[int] = None,
-    output_dir: Path = Path("./raw_timelapse_images"),
+    output_dir: Annotated[Path, typer.Option("-o", "--output")] = Path("./raw_timelapse_images"),
 ):
     config: Config = state["config"]
     dry_run = state["dry_run"]
@@ -79,6 +80,7 @@ def timelapse(
             target_iso=config.target_iso,
             target_shutter=config.target_shutter,
         ),
+        mode=mode,
         config=config,
         num_frames=num_frames,
         interval=timedelta(seconds=interval),
