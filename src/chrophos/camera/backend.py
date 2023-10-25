@@ -207,7 +207,7 @@ class Gphoto2Backend(Backend):
             p.value = camera_config.get_child_by_name(p.field).get_value()
         logger.debug("Pulled config from camera")
 
-    def push_config(self, bulk=True, params: Union[list[Parameter], None] = None, attempts=2):
+    def push_config(self, bulk=False, params: Union[list[Parameter], None] = None, attempts=2):
         camera_config = self._camera.get_config()
         if params is None:
             params = self.parameters.values()
@@ -232,6 +232,9 @@ class Gphoto2Backend(Backend):
         logger.debug("Pushed config to camera")
 
     def capture_and_download(self, output_dir: Path, stem: str):
+        return self.capture_and_download_slow(output_dir=output_dir, stem=stem)
+
+    def capture_and_download_slow(self, output_dir: Path, stem: str):
         logger.debug(f"Attempting to capture to {output_dir!s} with stem {stem!r}")
         output_dir.mkdir(parents=True, exist_ok=True)
         with Benchmark("Captured image", logger=logger.debug):
@@ -246,6 +249,31 @@ class Gphoto2Backend(Backend):
             camera_file.save(str(output_path))
         logger.info(f"Capture to {output_path} completed at {capture_dt}")
         return output_path, capture_dt
+
+    def capture_and_download_fast(self, output_dir: Path, stem: str):
+        logger.debug(f"Attempting to capture to {output_dir!s} with stem {stem!r}")
+        output_dir.mkdir(parents=True, exist_ok=True)
+        with Benchmark("Captured image", logger=logger.debug):
+            # _path = self._camera.capture(gp.GP_CAPTURE_IMAGE)
+            self._camera.trigger_capture()
+            while True:
+                event_type, event_data = self._camera.wait_for_event(3000)
+                if event_type == gp.GP_EVENT_FILE_ADDED:
+                    camera_file = self._camera.file_get(
+                        event_data.folder, event_data.name, gp.GP_FILE_TYPE_NORMAL
+                    )
+                    import os
+
+                    _path = os.path.join(os.getcwd(), event_data.name)
+                    output_path = output_dir / f"{stem}{Path(event_data.name).suffix}"
+                    with Benchmark(
+                        f"Downloaded image from camera to {output_path}",
+                        logger=logger.debug,
+                    ):
+                        camera_file.save(_path)
+                    capture_dt = datetime.fromtimestamp(camera_file.get_mtime())
+                    logger.info(f"Capture to {output_path} completed at {capture_dt}")
+                    return output_path, capture_dt
 
     def exit(self):
         if self.reset_camera_config_on_exit:

@@ -7,7 +7,6 @@ authors = [
 ]
 dependencies = [
     "gphoto2>=2.3.6",
-    "rawpy>=0.18.1",
     "matplotlib>=3.7.2",
     "deepdiff>=6.3.1",
     "typer>=0.9.0",
@@ -17,6 +16,9 @@ dependencies = [
 requires-python = ">=3.9"
 readme = "README.md"
 license = {text = "GPLv3"}
+
+[project.optional-dependencies]
+raw = ["rawpy>=0.18"]
 
 [project.scripts]
 chrophos = "chrophos.cli:app"
@@ -37,41 +39,63 @@ dev = [
 ]
 
 
-[tool.black]
-preview = true
-line-length = 100
 
 [tool.ruff]
 select = [
-  "F",    # https://beta.ruff.rs/docs/rules/#pyflakes-f
-  "E",    # https://beta.ruff.rs/docs/rules/#error-e
-  "W",    # https://beta.ruff.rs/docs/rules/#warning-w
-  "D",    # https://beta.ruff.rs/docs/rules/#pydocstyle-d
-  "B",    # https://beta.ruff.rs/docs/rules/#flake8-bugbear-b
-  "I",    # https://beta.ruff.rs/docs/rules/#isort-i
-  "NPY",  # https://beta.ruff.rs/docs/rules/#numpy-specific-rules-npy
-  "RUF",  # https://beta.ruff.rs/docs/rules/#ruff-specific-rules-ruf
-  "UP",   # https://beta.ruff.rs/docs/rules/#pyupgrade-up
-#  "TRY",  # https://beta.ruff.rs/docs/rules/#tryceratops-try
-#  "ERA",  # https://beta.ruff.rs/docs/rules/#eradicate-era
+  "F",    # https://docs.astral.sh/docs/rules/#pyflakes-f
+  "E",    # https://docs.astral.sh/docs/rules/#error-e
+  "W",    # https://docs.astral.sh/docs/rules/#warning-w
+  "B",    # https://docs.astral.sh/docs/rules/#flake8-bugbear-b
+  "I",    # https://docs.astral.sh/docs/rules/#isort-i
+  "NPY",  # https://docs.astral.sh/docs/rules/#numpy-specific-rules-npy
+  "PD",   # https://docs.astral.sh/docs/rules/#pandas-vet-pd
+  "RUF",  # https://docs.astral.sh/docs/rules/#ruff-specific-rules-ruf
+  "T100",  #https://docs.astral.sh/ruff/rules/debugger/
 ]
 fixable = ["ALL"]
-unfixable = ["B", "F401"]
+unfixable = ["B"]
 ignore = [
-  "E741",   # ambiguous-variable-name
-  "D100",   # Missing docstring in public module
-  "D101",   # Missing docstring in public class
-  "D102",   # Missing docstring in public method
-  "D103",   # Missing docstring in public function
-  "D104",   # Missing docstring in public package
-  "D105",   # Missing docstring in magic method
-  "D106",   # Missing docstring in public nested class
-  "D107",   # Missing docstring in `__init__`
-  "TRY003", # Abstract `raise` to an inner function
-  "TRY301", # Abstract `raise` to an inner function
-  "TRY301", # Avoid specifying long messages outside the exception class
+  "A",  # https://docs.astral.sh/ruff/rules/#flake8-builtins-a
+  "ANN",  # https://docs.astral.sh/ruff/rules/#flake8-annotations-ann
+  "ARG",  # https://docs.astral.sh/ruff/rules/#flake8-unused-arguments-arg
+  "BLE001",  # https://docs.astral.sh/ruff/rules/#flake8-blind-except-ble
+  "C901",  # https://docs.astral.sh/ruff/rules/complex-structure/
+  "D",  # https://docs.astral.sh/ruff/rules/#pydocstyle-d
+  "DJ",  # https://docs.astral.sh/ruff/rules/#flake8-django-dj
+  "DTZ",  # https://docs.astral.sh/ruff/rules/#flake8-datetimez-dtz
+  "E741",  # https://docs.astral.sh/ruff/rules/ambiguous-variable-name/
+  "EM",  # https://docs.astral.sh/ruff/rules/#flake8-errmsg-em
+  "ERA001",  # https://docs.astral.sh/ruff/rules/commented-out-code/
+  "FBT",  # https://docs.astral.sh/ruff/rules/#flake8-boolean-trap-fbt
+  "FIX",  # https://docs.astral.sh/ruff/rules/#flake8-fixme-fix
+  "G004",  # https://docs.astral.sh/ruff/rules/logging-f-string/
+  "INP001",  # https://beta.ruff.rs/docs/rules/#flake8-no-pep420: Checks for packages that are missing __init__.py
+  "N",  # https://beta.ruff.rs/docs/rules/#pep8-naming: various rules for variable/class/etc. names
+  "PD901",  # https://docs.astral.sh/ruff/rules/#pandas-vet-pd: df is a bad variable name
+  "PERF",  # https://beta.ruff.rs/docs/rules/#perflint: detects various performance anti-patterns
+  "PLR",  # https://beta.ruff.rs/docs/rules/#pylint
+  "PLW",  # https://beta.ruff.rs/docs/rules/#pylint
+  "PT",  # https://docs.astral.sh/ruff/rules/#flake8-pytest-style-pt
+  "PTH",  # flake8-use-pathlib: Use pathlib instead of os.path
+  "PYI",  # https://docs.astral.sh/ruff/rules/#flake8-pyi-pyi
+  "RET",  # https://docs.astral.sh/ruff/rules/#flake8-return-ret
+  "RUF012",  # https://docs.astral.sh/ruff/rules/mutable-class-default/
+  "S",  # https://docs.astral.sh/ruff/rules/#flake8-bandit-s
+  "SIM",  # https://docs.astral.sh/ruff/rules/#flake8-simplify-sim
+  "SLF",  # https://docs.astral.sh/ruff/rules/#flake8-self-slf
+  "T20",  # https://docs.astral.sh/ruff/rules/#flake8-print-t20
+  "TD",  # https://docs.astral.sh/ruff/rules/#flake8-todos-td
+  "TRY003",  # https://docs.astral.sh/ruff/rules/raise-vanilla-args/
+  "TRY301",  # https://docs.astral.sh/ruff/rules/raise-within-try/
+  "W191",  # https://docs.astral.sh/ruff/rules/tab-indentation/
+  "E501", # https://docs.astral.sh/ruff/rules/line-too-long/  # TODO: would be nice to check long comments...
 ]
+extend-exclude = ["toys", "alda/utils/mjd.py"]
 line-length = 100
+
+# https://docs.astral.sh/ruff/settings/#isort
+[tool.ruff.isort]
+combine-as-imports = true
 
 [tool.ruff.pydocstyle]
 convention = "google"

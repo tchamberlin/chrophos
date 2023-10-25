@@ -106,7 +106,7 @@ class Camera:
         raise ValueError("Failed to step exposure!")
 
     def determine_good_exposure(self, mode=MODE.PROGRAM):
-        inv = {v: k for k, v in self.config.config_map["auto_exposure_mode"].values.items()}
+        inv = {v: k for k, v in self.config.config_map["auto_exposure_mode"].to_numpy().items()}
         original_mode = inv[self.backend.auto_exposure_mode.value]
         self.switch_mode(mode)
         with self.backend.half_press_shutter_during():
@@ -142,7 +142,7 @@ class Camera:
         aem = self.config.config_map["auto_exposure_mode"]
         if isinstance(aem, str):
             raise ValueError("config issue")
-        self.backend.auto_exposure_mode.value = aem.values[mode]
+        self.backend.auto_exposure_mode.value = aem.to_numpy()[mode]
         self.backend.push_config(params=[self.backend.auto_exposure_mode], bulk=False)
 
     def auto_expose_via_light_meter(self, target_bounds=(-5, 5), delay=0.05):

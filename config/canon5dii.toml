@@ -1,4 +1,11 @@
 camera_model = "Canon EOS 5D Mark II"
+
+dark_time = 6  # Rounded up from worst case of 5.3s. See canon_5d_ii_dark_time_bench.txt
+
+target_shutter = "1/100"
+target_aperture = 2
+target_iso = 100
+
 shutter_min = "1/8000"
 shutter_max = "30"
 aperture_min = 2
@@ -6,8 +13,7 @@ aperture_min = 2
 aperture_max = 11
 iso_min = 100
 iso_max = 6400  # As per https://www.photonstophotos.net/Charts/PDR_Shadow.htm
-mode = "aperture_priority"
-dark_time = 5
+
 
 [config_map]
 shutter = "shutterspeed"

@@ -5,6 +5,7 @@ from typing import Annotated, Optional
 
 import typer
 
+import chrophos.bench
 import chrophos.plan
 import chrophos.query
 import chrophos.shell
@@ -48,6 +49,27 @@ def plan():
 @app.command()
 def query():
     chrophos.query.main()
+
+
+@app.command()
+def bench(
+    trials: int,
+    shutters: list[str],
+    output_dir: Annotated[Path, typer.Option("-o", "--output")] = Path("./raw_bench_images"),
+):
+    config: Config = state["config"]
+    chrophos.bench.bench(
+        trials=trials,
+        shutters=shutters,
+        backend=Canon5DII(
+            config_map=config.config_map,
+            target_aperture=config.target_aperture,
+            target_iso=config.target_iso,
+            target_shutter=config.target_shutter,
+        ),
+        output_dir=output_dir,
+        config=config,
+    )
 
 
 @app.command()
