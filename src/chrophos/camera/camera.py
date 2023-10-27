@@ -180,10 +180,13 @@ class Camera:
         return self.light_meter.value
 
     def capture_and_download(self, output_dir: Path, stem: str):
-        return self.backend.capture_and_download(output_dir, stem)
+        return self.backend.capture_and_download(output_dir=output_dir, stem=stem)
 
     def summary(self):
         return self.exposure.description()
+
+    def empty_event_queue(self):
+        return self.backend.empty_event_queue()
 
 
 @contextmanager

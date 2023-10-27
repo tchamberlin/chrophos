@@ -42,8 +42,14 @@ def init_logging(verbosity: int):
 
 
 @app.command()
-def plan():
-    chrophos.plan.summary()
+def plan(
+    input_frames: Annotated[int, typer.Option("-f", "--frames")] = 1000,
+    input_interval: Annotated[float, typer.Option("-i", "--capture-interval")] = 20,
+    output_fps: Annotated[int, typer.Option("-o", "--output-fps")] = 30,
+):
+    chrophos.plan.summary(
+        input_frames=input_frames, input_interval=input_interval, output_fps=output_fps
+    )
 
 
 @app.command()

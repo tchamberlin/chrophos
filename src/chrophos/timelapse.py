@@ -96,6 +96,7 @@ def timelapse(
         #     sleep(0.5)
         # logger.info(f"Current camera exposure state: {summary}")
         for i, commanded_capture_time in enumerate(times, 1):
+            camera.empty_event_queue()
             with camera.backend.half_press_shutter_during():
                 shutter_speed = timedelta(seconds=camera.shutter.actual_value)
             total_shot_time = shutter_speed + dark_time

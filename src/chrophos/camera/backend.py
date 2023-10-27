@@ -74,6 +74,10 @@ class Backend(ABC):
     def exit(self):
         ...
 
+    @abstractmethod
+    def empty_event_queue(camera):
+        ...
+
 
 class Gphoto2Backend(Backend):
     def __init__(
@@ -232,9 +236,6 @@ class Gphoto2Backend(Backend):
         logger.debug("Pushed config to camera")
 
     def capture_and_download(self, output_dir: Path, stem: str):
-        return self.capture_and_download_slow(output_dir=output_dir, stem=stem)
-
-    def capture_and_download_slow(self, output_dir: Path, stem: str):
         logger.debug(f"Attempting to capture to {output_dir!s} with stem {stem!r}")
         output_dir.mkdir(parents=True, exist_ok=True)
         with Benchmark("Captured image", logger=logger.debug):
@@ -250,31 +251,6 @@ class Gphoto2Backend(Backend):
         logger.info(f"Capture to {output_path} completed at {capture_dt}")
         return output_path, capture_dt
 
-    def capture_and_download_fast(self, output_dir: Path, stem: str):
-        logger.debug(f"Attempting to capture to {output_dir!s} with stem {stem!r}")
-        output_dir.mkdir(parents=True, exist_ok=True)
-        with Benchmark("Captured image", logger=logger.debug):
-            # _path = self._camera.capture(gp.GP_CAPTURE_IMAGE)
-            self._camera.trigger_capture()
-            while True:
-                event_type, event_data = self._camera.wait_for_event(3000)
-                if event_type == gp.GP_EVENT_FILE_ADDED:
-                    camera_file = self._camera.file_get(
-                        event_data.folder, event_data.name, gp.GP_FILE_TYPE_NORMAL
-                    )
-                    import os
-
-                    _path = os.path.join(os.getcwd(), event_data.name)
-                    output_path = output_dir / f"{stem}{Path(event_data.name).suffix}"
-                    with Benchmark(
-                        f"Downloaded image from camera to {output_path}",
-                        logger=logger.debug,
-                    ):
-                        camera_file.save(_path)
-                    capture_dt = datetime.fromtimestamp(camera_file.get_mtime())
-                    logger.info(f"Capture to {output_path} completed at {capture_dt}")
-                    return output_path, capture_dt
-
     def exit(self):
         if self.reset_camera_config_on_exit:
             logger.info("Resetting camera config to original state")
@@ -286,6 +262,15 @@ class Gphoto2Backend(Backend):
         return (
             f"Shutter: {self.shutter.value}; Aperture: {self.aperture.value}; ISO: {self.iso.value}"
         )
+
+    def empty_event_queue(self, timeout=10):
+        while True:
+            type_, data = self.wait_for_event(timeout)
+            if type_ == gp.GP_EVENT_TIMEOUT:
+                return
+            if type_ == gp.GP_EVENT_FILE_ADDED:
+                # get a second image if camera is set to raw + jpeg
+                logger.info("Unexpected new file", data.folder + data.name)
 
 
 class Canon5DII(Gphoto2Backend):
@@ -336,3 +321,66 @@ class Canon5DII(Gphoto2Backend):
         )
         self.set_config_value("autoexposuremode", "Manual")
         self.set_config_value("meteringmode", "Evaluative")
+
+
+class DummyBackend(Backend):
+    def __init__(
+        self,
+        config_map: dict[str, Union[str, Complex]],
+        target_shutter: float,
+        target_aperture: float,
+        target_iso: int,
+    ):
+        self.target_shutter = target_shutter
+
+        self.target_aperture = target_aperture
+        self.target_iso = target_iso
+        self.pre_init_camera()
+
+        self.parameters = {}
+        self.shutter = Shutter(
+            "shutter",
+            config_map["shutter"],
+            choices=["1/8000", "1/100", "1"],
+            initial_value="1/100",
+        )
+        self.parameters["shutter"] = self.shutter
+
+        self.aperture = Aperture(
+            "aperture",
+            config_map["aperture"],
+            choices=["2", "2.8", "4", "11"],
+            initial_value="2",
+        )
+        self.parameters["aperture"] = self.aperture
+
+        self.iso = ISO(
+            "iso",
+            config_map["iso"],
+            choices=["100", "1000", "12800"],
+            initial_value="100",
+        )
+        self.parameters["iso"] = self.iso
+
+        self.auto_exposure_mode = DiscreteParameter(
+            "auto_exposure_mode",
+            config_map["auto_exposure_mode"].key,
+            choices=["M", "P", "A", "S"],
+            initial_value="M",
+        )
+        self.parameters["auto_exposure_mode"] = self.auto_exposure_mode
+        # Push config to camera
+        self.push_config()
+        # Perform any post-init tasks that need to be performed
+        self.post_init_camera()
+        # Pull the config from the camera, in case things changed as a result of post_init_camera
+        self.pull_config()
+
+    def capture_and_download(self, output_dir: Path, stem: str) -> tuple[Path, datetime]:
+        ...
+
+    def exit(self):
+        ...
+
+    def empty_event_queue(camera):
+        ...
