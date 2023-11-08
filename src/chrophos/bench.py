@@ -7,7 +7,7 @@ import typer
 
 from chrophos.camera.backend import Backend
 from chrophos.camera.camera import open_camera
-from chrophos.config import Config
+from chrophos.config import CameraConfig
 
 logger = logging.getLogger(__name__)
 
@@ -24,13 +24,18 @@ def print_stats(prefix: str, dark_times: list[float]):
     print(f"  Max:  {max_dark_time:.2f}")
 
 
-def bench_shutter(
+def bench_dark_time_for_shutter_speed(
     trials: int,
     shutter: str,
     backend: Backend,
-    config: Config,
+    config: CameraConfig,
     output_dir: Path,
 ):
+    """Benchmark the dark time at a given shutter speed
+
+    Dark time: the time required between the end of a capture and the start of the next
+    """
+
     dark_times = []
     with open_camera(backend=backend, config=config) as camera:
         logger.debug(f"Setting shutter to {shutter}")
@@ -53,16 +58,29 @@ def bench_shutter(
     return dark_times
 
 
+def bench_sustained_capture_rate(
+    trials: int, shutter: str, backend: Backend, config: CameraConfig, output_dir: Path
+):
+    """Capture images as quickly as possible; see how long it takes
+
+    Capture will end after ONE OF:
+
+    1. Camera error
+    2. Sustained rate slow down past given delta TODO
+    3. Requested number of captures has been satisfied
+    """
+
+
 def bench(
     trials: int,
     shutters: list[str],
     backend: Backend,
-    config: Config,
+    config: CameraConfig,
     output_dir: Path,
 ):
     dark_times_per_shutter: dict[str, list[float]] = {}
     for shutter in shutters:
-        dark_times_per_shutter[shutter] = bench_shutter(
+        dark_times_per_shutter[shutter] = bench_dark_time_for_shutter_speed(
             trials=trials,
             shutter=shutter,
             backend=backend,

@@ -244,7 +244,7 @@ class Gphoto2Backend(Backend):
         logger.info(f"Captured to camera path {path_on_camera}")
         camera_file = self._camera.file_get(_path.folder, _path.name, gp.GP_FILE_TYPE_NORMAL)
         capture_dt = datetime.fromtimestamp(camera_file.get_mtime())
-
+        stem = stem.format(capture_dt=capture_dt.isoformat())
         output_path = output_dir / f"{stem}{path_on_camera.suffix}"
         with Benchmark(f"Downloaded image from camera to {output_path}", logger=logger.debug):
             camera_file.save(str(output_path))

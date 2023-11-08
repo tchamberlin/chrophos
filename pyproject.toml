@@ -48,7 +48,6 @@ select = [
   "B",    # https://docs.astral.sh/docs/rules/#flake8-bugbear-b
   "I",    # https://docs.astral.sh/docs/rules/#isort-i
   "NPY",  # https://docs.astral.sh/docs/rules/#numpy-specific-rules-npy
-  "PD",   # https://docs.astral.sh/docs/rules/#pandas-vet-pd
   "RUF",  # https://docs.astral.sh/docs/rules/#ruff-specific-rules-ruf
   "T100",  #https://docs.astral.sh/ruff/rules/debugger/
 ]

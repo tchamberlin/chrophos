@@ -9,7 +9,7 @@ import typer
 
 from chrophos.camera.backend import Backend
 from chrophos.camera.camera import Camera, open_camera
-from chrophos.config import Config
+from chrophos.config import CameraConfig
 from chrophos.plan import format_timedelta
 
 logger = logging.getLogger(__name__)
@@ -49,7 +49,9 @@ def get_nearest_shutter_under(camera: Camera, value):
 
 
 def gen_times(
-    interval: timedelta, num_frames: Union[int, None] = None, start: Union[datetime, None] = None
+    interval: timedelta,
+    num_frames: Union[int, None] = None,
+    start: Union[datetime, None] = None,
 ):
     if start is None:
         start = datetime.now()
@@ -64,7 +66,7 @@ def gen_times(
 
 def timelapse(
     backend: Backend,
-    config: Config,
+    config: CameraConfig,
     num_frames: Union[int, None],
     interval: timedelta,
     output_dir: Path,

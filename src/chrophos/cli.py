@@ -8,10 +8,11 @@ import typer
 import chrophos.bench
 import chrophos.plan
 import chrophos.query
+import chrophos.seq
 import chrophos.shell
 import chrophos.timelapse
 from chrophos.camera.backend import Canon5DII
-from chrophos.config import Config, parse_config
+from chrophos.config import CameraConfig, parse_config
 
 app = typer.Typer()
 
@@ -53,6 +54,22 @@ def plan(
 
 
 @app.command()
+def seq(action: str, output_dir: Path):
+    config: CameraConfig = state["config"]
+    chrophos.seq.capture_sequence(
+        action=action,
+        output_dir=output_dir,
+        base_config=config,
+        backend=Canon5DII(
+            config_map=config.config_map,
+            target_aperture=config.target_aperture,
+            target_iso=config.target_iso,
+            target_shutter=config.target_shutter,
+        ),
+    )
+
+
+@app.command()
 def query():
     chrophos.query.main()
 
@@ -63,7 +80,7 @@ def bench(
     shutters: list[str],
     output_dir: Annotated[Path, typer.Option("-o", "--output")] = Path("./raw_bench_images"),
 ):
-    config: Config = state["config"]
+    config: CameraConfig = state["config"]
     chrophos.bench.bench(
         trials=trials,
         shutters=shutters,
@@ -99,7 +116,7 @@ def timelapse(
     num_frames: Optional[int] = None,
     output_dir: Annotated[Path, typer.Option("-o", "--output")] = Path("./raw_timelapse_images"),
 ):
-    config: Config = state["config"]
+    config: CameraConfig = state["config"]
     dry_run = state["dry_run"]
     chrophos.timelapse.timelapse(
         backend=Canon5DII(

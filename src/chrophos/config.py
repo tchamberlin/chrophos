@@ -14,7 +14,7 @@ class Shutter(str):
     pass
 
 
-class ISO(int):
+class Iso(int):
     pass
 
 
@@ -25,14 +25,17 @@ class Complex:
 
 
 @dataclass
-class Config:
-    target_iso: ISO
+class CameraConfig:
+    target_iso: Iso
     target_shutter: Shutter
     target_aperture: Aperture
+
+    shutter_min: Shutter
+    shutter_max: Shutter
     aperture_min: Aperture
     aperture_max: Aperture
-    iso_min: ISO
-    iso_max: ISO
+    iso_min: Iso
+    iso_max: Iso
     config_map: dict[str, Union[str, Complex]]
     dark_time: timedelta
 
@@ -51,10 +54,12 @@ def parse_param(param: Union[str, dict[str, Any]]):
 
 def parse_config(path: Path):
     config = parse_config_raw(path)
-    return Config(
+    return CameraConfig(
         target_iso=config["target_iso"],
         target_shutter=config["target_shutter"],
         target_aperture=config["target_aperture"],
+        shutter_min=config["shutter_min"],
+        shutter_max=config["shutter_max"],
         aperture_min=config["aperture_min"],
         aperture_max=config["aperture_max"],
         iso_min=config["iso_min"],

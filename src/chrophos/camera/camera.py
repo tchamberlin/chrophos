@@ -7,7 +7,7 @@ from time import sleep
 
 from chrophos.camera.backend import Backend
 from chrophos.camera.parameter import ValidationError
-from chrophos.config import Config
+from chrophos.config import CameraConfig
 
 logger = logging.getLogger(__name__)
 
@@ -43,25 +43,42 @@ class Camera:
     @dataclass
     class MODE:
         PROGRAM = "program"
-        APERTURE_PRIORITY = "APERTURE_PRIORITY"
-        SHUTTER_PRIORITY = "SHUTTER_PRIORITY"
-        MANUAL = "MANUAL"
+        APERTURE_PRIORITY = "aperture_priority"
+        SHUTTER_PRIORITY = "shutter_priority"
+        MANUAL = "manual"
 
     def __init__(
         self,
         backend: Backend,
-        config: Config,
+        config: CameraConfig,
     ):
         self.backend = backend
-        self.config = config
-        # TODO: This is only needed for nikon
-        # self.config.set_value("imagequality", "NEF (Raw)")
+        self._config = config
 
         # Shortcuts
         self.light_meter = getattr(self.backend, "light_meter", None)
         self.iso = self.backend.iso
-        self.aperture = self.backend.aperture
+        self._aperture = self.backend.aperture
         self.shutter = self.backend.shutter
+
+    @property
+    def config(self):
+        return self._config
+
+    @config.setter
+    def config(self, config: CameraConfig):
+        self._config = config
+        logger.debug(f"Changed config from {self._config} to {config}")
+
+    @property
+    def aperture(self):
+        return self._aperture
+
+    @aperture.setter
+    def aperture(self, aperture: float):
+        original_aperture = str(self._aperture)
+        self._aperture.value = str(aperture)
+        logger.debug(f"Changed aperture from {original_aperture} to {self._aperture}")
 
     @property
     def exposure(self):
@@ -69,6 +86,15 @@ class Camera:
         aperture = self.aperture.actual_value
         shutter = self.shutter.actual_value
         return ExposureTriangle(aperture=aperture, iso=iso, shutter=shutter)
+
+    def step_aperture(self, step=1):
+        return self.aperture.step_value(step)
+
+    def step_shutter(self, step=1):
+        return self.shutter.step_value(step)
+
+    def step_iso(self, step=1):
+        return self.iso.step_value(step)
 
     # TODO: Step size is configurable in camera; need to make sure these are synced up
     # TODO: This really needs to be a feedback loop where it checks the results along the way
@@ -106,7 +132,7 @@ class Camera:
         raise ValueError("Failed to step exposure!")
 
     def determine_good_exposure(self, mode=MODE.PROGRAM):
-        inv = {v: k for k, v in self.config.config_map["auto_exposure_mode"].to_numpy().items()}
+        inv = {v: k for k, v in self.config.config_map["auto_exposure_mode"].values.items()}
         original_mode = inv[self.backend.auto_exposure_mode.value]
         self.switch_mode(mode)
         with self.backend.half_press_shutter_during():
@@ -119,11 +145,6 @@ class Camera:
         self.switch_mode(original_mode)
         logger.debug(exposure_triangle.description())
         return exposure_triangle
-
-    # def auto_expose(self):
-    #     original_values = self.get_exposure_triangle()
-    #     new_values = self.get_exposure_triangle()
-    #
 
     def set_program_mode(self):
         self.switch_mode(self.MODE.PROGRAM)
@@ -142,7 +163,7 @@ class Camera:
         aem = self.config.config_map["auto_exposure_mode"]
         if isinstance(aem, str):
             raise ValueError("config issue")
-        self.backend.auto_exposure_mode.value = aem.to_numpy()[mode]
+        self.backend.auto_exposure_mode.value = aem.values[mode]
         self.backend.push_config(params=[self.backend.auto_exposure_mode], bulk=False)
 
     def auto_expose_via_light_meter(self, target_bounds=(-5, 5), delay=0.05):
@@ -179,7 +200,9 @@ class Camera:
             sleep(delay)
         return self.light_meter.value
 
-    def capture_and_download(self, output_dir: Path, stem: str):
+    def capture_and_download(self, output_dir: Path, stem: str, config: CameraConfig | None = None):
+        if config is not None:
+            self.config = config
         return self.backend.capture_and_download(output_dir=output_dir, stem=stem)
 
     def summary(self):
@@ -190,7 +213,7 @@ class Camera:
 
 
 @contextmanager
-def open_camera(backend: Backend, config: Config):
+def open_camera(backend: Backend, config: CameraConfig):
     try:
         camera = Camera(backend, config)
         yield camera
