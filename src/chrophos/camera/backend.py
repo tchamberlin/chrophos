@@ -12,7 +12,7 @@ from ..config import Complex
 from ..utilities.benchmark import Benchmark
 from .parameter import DiscreteParameter, Parameter, ReadonlyParameter, ValidationError
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("chrophos")
 
 
 class Aperture(DiscreteParameter):
@@ -42,7 +42,7 @@ class Shutter(DiscreteParameter):
             raise ValidationError(f"Invalid shutter value {shutter!r}") from error
 
 
-class ISO(DiscreteParameter):
+class Iso(DiscreteParameter):
     def parse(self, value: str):
         try:
             return int(value)
@@ -58,7 +58,7 @@ class Backend(ABC):
     """An abstraction of a physical camera."""
 
     aperture: Aperture
-    iso: ISO
+    iso: Iso
     shutter: Shutter
     light_meter: Union[ReadonlyParameter, None]
 
@@ -67,15 +67,13 @@ class Backend(ABC):
         ...
 
     @abstractmethod
-    def capture_and_download(self, output_dir: Path, stem: str) -> tuple[Path, datetime]:
+    def capture_and_download(
+        self, output_dir: Path | None = None, stem: str | None = None
+    ) -> tuple[Path, datetime]:
         ...
 
     @abstractmethod
     def exit(self):
-        ...
-
-    @abstractmethod
-    def empty_event_queue(camera):
         ...
 
 
@@ -87,7 +85,6 @@ class Gphoto2Backend(Backend):
         target_aperture: float,
         target_iso: int,
         reset_camera_config_on_exit=False,
-        half_press_on_init=False,
     ):
         try:
             self._camera = gp.Camera()
@@ -113,6 +110,7 @@ class Gphoto2Backend(Backend):
             config_map["shutter"],
             choices=list(shutter.get_choices()),
             initial_value=shutter.get_value(),
+            setter=self.push_config,
         )
         self.parameters["shutter"] = self.shutter
 
@@ -122,11 +120,12 @@ class Gphoto2Backend(Backend):
             config_map["aperture"],
             choices=list(aperture.get_choices()),
             initial_value=aperture.get_value(),
+            setter=self.push_config,
         )
         self.parameters["aperture"] = self.aperture
 
         iso = camera_config.get_child_by_name("iso")
-        self.iso = ISO(
+        self.iso = Iso(
             "iso",
             config_map["iso"],
             # TODO: Don't reverse this; need to properly sort!
@@ -142,15 +141,6 @@ class Gphoto2Backend(Backend):
             self.parameters["light_meter"] = self.light_meter
         else:
             self.light_meter = None
-
-        shutter_release = camera_config.get_child_by_name(config_map["shutter_release"].key)
-        self.shutter_release = DiscreteParameter(
-            "shutter_release",
-            config_map["shutter_release"].key,
-            choices=list(shutter_release.get_choices()),
-            initial_value=shutter_release.get_value(),
-        )
-        self.parameters["shutter_release"] = self.shutter_release
 
         auto_exposure_mode = camera_config.get_child_by_name(config_map["auto_exposure_mode"].key)
         self.auto_exposure_mode = DiscreteParameter(
@@ -212,7 +202,6 @@ class Gphoto2Backend(Backend):
         logger.debug("Pulled config from camera")
 
     def push_config(self, bulk=False, params: Union[list[Parameter], None] = None, attempts=2):
-        camera_config = self._camera.get_config()
         if params is None:
             params = self.parameters.values()
         else:
@@ -220,6 +209,7 @@ class Gphoto2Backend(Backend):
         for p in params:
             logger.debug(f"Attempting to set {p.field} to {p.value}")
             if bulk:
+                camera_config = self._camera.get_config()
                 camera_config.get_child_by_name(p.field).set_value(p.value)
             else:
                 self.set_config_value(p.field, p.value)
@@ -227,6 +217,7 @@ class Gphoto2Backend(Backend):
         if bulk:
             for i in range(attempts + 1, 1):
                 try:
+                    camera_config = self._camera.get_config()
                     self._camera.set_config(camera_config)
                 except gp.GPhoto2Error as error:
                     if i == attempts:
@@ -235,20 +226,38 @@ class Gphoto2Backend(Backend):
                         logger.debug(f"{error}; trying again")
         logger.debug("Pushed config to camera")
 
-    def capture_and_download(self, output_dir: Path, stem: str):
-        logger.debug(f"Attempting to capture to {output_dir!s} with stem {stem!r}")
-        output_dir.mkdir(parents=True, exist_ok=True)
+    def capture_and_download(
+        self, output_dir: Path | None = None, stem: str | None = None, timeout=3_000
+    ):
+        logger.debug("Start capture")
         with Benchmark("Captured image", logger=logger.debug):
-            _path = self._camera.capture(gp.GP_CAPTURE_IMAGE)
-        path_on_camera = Path(_path.folder + _path.name)
+            # This method seems slightly faster than the capture() method
+            self._camera.trigger_capture()
+            while True:
+                event_type, event_data = self._camera.wait_for_event(timeout)
+                if event_type == gp.GP_EVENT_FILE_ADDED:
+                    break
+        path_on_camera = Path(event_data.folder + event_data.name)
         logger.info(f"Captured to camera path {path_on_camera}")
-        camera_file = self._camera.file_get(_path.folder, _path.name, gp.GP_FILE_TYPE_NORMAL)
-        capture_dt = datetime.fromtimestamp(camera_file.get_mtime())
-        stem = stem.format(capture_dt=capture_dt.isoformat())
-        output_path = output_dir / f"{stem}{path_on_camera.suffix}"
-        with Benchmark(f"Downloaded image from camera to {output_path}", logger=logger.debug):
-            camera_file.save(str(output_path))
-        logger.info(f"Capture to {output_path} completed at {capture_dt}")
+        if output_dir:
+            output_dir.mkdir(parents=True, exist_ok=True)
+            with Benchmark("Downloaded image from camera", logger=logger.debug):
+                camera_file = self._camera.file_get(
+                    event_data.folder, event_data.name, gp.GP_FILE_TYPE_NORMAL
+                )
+            capture_dt = datetime.fromtimestamp(camera_file.get_mtime())
+            if stem:
+                stem = stem.format(capture_dt=capture_dt.isoformat())
+            else:
+                stem = path_on_camera.name
+            output_path = output_dir / f"{stem}{path_on_camera.suffix}"
+            with Benchmark(f"Saved image from camera to {output_path}", logger=logger.debug):
+                camera_file.save(str(output_path))
+            logger.info(f"Capture to {output_path} completed at {capture_dt}")
+        else:
+            logger.info("Capture completed")
+            output_path = None
+            capture_dt = None
         return output_path, capture_dt
 
     def exit(self):
@@ -354,7 +363,7 @@ class DummyBackend(Backend):
         )
         self.parameters["aperture"] = self.aperture
 
-        self.iso = ISO(
+        self.iso = Iso(
             "iso",
             config_map["iso"],
             choices=["100", "1000", "12800"],

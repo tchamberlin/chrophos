@@ -7,7 +7,7 @@ from time import sleep
 
 from chrophos.camera.backend import Backend
 from chrophos.camera.parameter import ValidationError
-from chrophos.config import CameraConfig
+from chrophos.config import CameraConfig, Complex
 
 logger = logging.getLogger(__name__)
 
@@ -57,9 +57,9 @@ class Camera:
 
         # Shortcuts
         self.light_meter = getattr(self.backend, "light_meter", None)
-        self.iso = self.backend.iso
+        self._iso = self.backend.iso
         self._aperture = self.backend.aperture
-        self.shutter = self.backend.shutter
+        self._shutter = self.backend.shutter
 
     @property
     def config(self):
@@ -70,15 +70,42 @@ class Camera:
         self._config = config
         logger.debug(f"Changed config from {self._config} to {config}")
 
+    def set_config_value(self, key: str, value: any):
+        if key in self.config.config_map:
+            if isinstance(self.config.config_map[key], Complex):
+                actual_key = self.config.config_map[key].key
+                actual_value = self.config.config_map[key].values[value]
+                logger.debug(
+                    f"Mapped key {key} to {actual_key} and value {value} to value {actual_value}"
+                )
+            else:
+                actual_key = key
+                actual_value = value
+        return self.backend.set_config_value(actual_key, actual_value)
+
     @property
     def aperture(self):
         return self._aperture
 
     @aperture.setter
-    def aperture(self, aperture: float):
-        original_aperture = str(self._aperture)
+    def aperture(self, aperture: float | str | int):
         self._aperture.value = str(aperture)
-        logger.debug(f"Changed aperture from {original_aperture} to {self._aperture}")
+
+    @property
+    def shutter(self):
+        return self._shutter
+
+    @shutter.setter
+    def shutter(self, shutter: float | str | int):
+        self._shutter.value = str(shutter)
+
+    @property
+    def iso(self):
+        return self._iso
+
+    @iso.setter
+    def iso(self, iso: float | str | int):
+        self._iso.value = str(iso)
 
     @property
     def exposure(self):
@@ -200,16 +227,10 @@ class Camera:
             sleep(delay)
         return self.light_meter.value
 
-    def capture_and_download(self, output_dir: Path, stem: str, config: CameraConfig | None = None):
-        if config is not None:
-            self.config = config
+    def capture(self, output_dir: Path | None = None, stem: str | None = None):
+        """Capture an image and save to to `output_dir` using `stem` as the basis for its name"""
+
         return self.backend.capture_and_download(output_dir=output_dir, stem=stem)
-
-    def summary(self):
-        return self.exposure.description()
-
-    def empty_event_queue(self):
-        return self.backend.empty_event_queue()
 
 
 @contextmanager

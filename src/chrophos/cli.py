@@ -11,7 +11,8 @@ import chrophos.query
 import chrophos.seq
 import chrophos.shell
 import chrophos.timelapse
-from chrophos.camera.backend import Canon5DII
+from chrophos.camera.backend import Canon5DII, Gphoto2Backend
+from chrophos.camera.camera import Camera
 from chrophos.config import CameraConfig, parse_config
 
 app = typer.Typer()
@@ -78,35 +79,21 @@ def query():
 def bench(
     trials: int,
     shutters: list[str],
+    mode: Annotated[str, typer.Option("-m", "--mode")],
     output_dir: Annotated[Path, typer.Option("-o", "--output")] = Path("./raw_bench_images"),
 ):
-    config: CameraConfig = state["config"]
     chrophos.bench.bench(
         trials=trials,
+        mode=mode,
         shutters=shutters,
-        backend=Canon5DII(
-            config_map=config.config_map,
-            target_aperture=config.target_aperture,
-            target_iso=config.target_iso,
-            target_shutter=config.target_shutter,
-        ),
+        camera=state["camera"],
         output_dir=output_dir,
-        config=config,
     )
 
 
 @app.command()
 def shell():
-    config = state["config"]
-    chrophos.shell.shell(
-        config=config,
-        backend=Canon5DII(
-            config_map=config.config_map,
-            target_aperture=config.target_aperture,
-            target_iso=config.target_iso,
-            target_shutter=config.target_shutter,
-        ),
-    )
+    chrophos.shell.shell(camera=state["camera"])
 
 
 @app.command()
@@ -116,21 +103,13 @@ def timelapse(
     num_frames: Optional[int] = None,
     output_dir: Annotated[Path, typer.Option("-o", "--output")] = Path("./raw_timelapse_images"),
 ):
-    config: CameraConfig = state["config"]
-    dry_run = state["dry_run"]
     chrophos.timelapse.timelapse(
-        backend=Canon5DII(
-            config_map=config.config_map,
-            target_aperture=config.target_aperture,
-            target_iso=config.target_iso,
-            target_shutter=config.target_shutter,
-        ),
+        camera=state["camera"],
         mode=mode,
-        config=config,
         num_frames=num_frames,
         interval=timedelta(seconds=interval),
         output_dir=output_dir,
-        dry_run=dry_run,
+        dry_run=state["dry_run"],
     )
 
 
@@ -140,7 +119,15 @@ def main(
     verbosity: Annotated[int, typer.Option("-v")] = 1,
     dry_run: Annotated[bool, typer.Option("-D", "--dry-run")] = False,
 ):
-    state["config"] = parse_config(config_path)
+    config = parse_config(config_path)
+    state["config"] = config
+    state["backend"] = Gphoto2Backend(
+        config_map=config.config_map,
+        target_aperture=config.target_aperture,
+        target_iso=config.target_iso,
+        target_shutter=config.target_shutter,
+    )
+    state["camera"] = Camera(backend=state["backend"], config=state["config"])
     state["dry_run"] = dry_run
     init_logging(verbosity)
 

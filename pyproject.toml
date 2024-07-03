@@ -41,7 +41,7 @@ dev = [
 
 
 [tool.ruff]
-select = [
+lint.select = [
   "F",    # https://docs.astral.sh/docs/rules/#pyflakes-f
   "E",    # https://docs.astral.sh/docs/rules/#error-e
   "W",    # https://docs.astral.sh/docs/rules/#warning-w
@@ -51,9 +51,9 @@ select = [
   "RUF",  # https://docs.astral.sh/docs/rules/#ruff-specific-rules-ruf
   "T100",  #https://docs.astral.sh/ruff/rules/debugger/
 ]
-fixable = ["ALL"]
-unfixable = ["B"]
-ignore = [
+lint.fixable = ["ALL"]
+lint.unfixable = ["B"]
+lint.ignore = [
   "A",  # https://docs.astral.sh/ruff/rules/#flake8-builtins-a
   "ANN",  # https://docs.astral.sh/ruff/rules/#flake8-annotations-ann
   "ARG",  # https://docs.astral.sh/ruff/rules/#flake8-unused-arguments-arg
@@ -93,10 +93,10 @@ extend-exclude = ["toys", "alda/utils/mjd.py"]
 line-length = 100
 
 # https://docs.astral.sh/ruff/settings/#isort
-[tool.ruff.isort]
+[tool.ruff.lint.isort]
 combine-as-imports = true
 
-[tool.ruff.pydocstyle]
+[tool.ruff.lint.pydocstyle]
 convention = "google"
 
 [tool.pyright]

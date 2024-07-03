@@ -7,9 +7,7 @@ from typing import Union
 
 import typer
 
-from chrophos.camera.backend import Backend
-from chrophos.camera.camera import Camera, open_camera
-from chrophos.config import CameraConfig
+from chrophos.camera.camera import Camera
 from chrophos.plan import format_timedelta
 
 logger = logging.getLogger(__name__)
@@ -65,8 +63,7 @@ def gen_times(
 
 
 def timelapse(
-    backend: Backend,
-    config: CameraConfig,
+    camera: Camera,
     num_frames: Union[int, None],
     interval: timedelta,
     output_dir: Path,
@@ -74,7 +71,12 @@ def timelapse(
     dark_time: Union[timedelta, None] = None,
     start_delay=timedelta(seconds=1),
     dry_run=False,
+    overwrite=False,
 ):
+    if not overwrite and output_dir.is_dir() and any(output_dir.iterdir()):
+        raise ValueError(f"Given output directory {output_dir} already exists and is non-empty!")
+    config = camera.config
+    backend = camera.backend
     if dark_time is None:
         dark_time = config.dark_time
 
@@ -85,46 +87,51 @@ def timelapse(
         raise ValueError(
             f"Requested interval of {interval} is longer than expected dark time of {dark_time}"
         )
+
     logger.debug(f"{backend=}")
     output_dir.mkdir(exist_ok=True, parents=True)
     start = datetime.now() + start_delay
     times = gen_times(interval, num_frames, start)
     template = "TL{i}"
-    camera: Camera
-    with open_camera(backend=backend, config=config) as camera:
-        camera.backend.set_config_value("autoexposuremode", mode)
-        # with camera.backend.half_press_shutter_during():
-        #     summary = camera.summary()
-        #     sleep(0.5)
-        # logger.info(f"Current camera exposure state: {summary}")
-        for i, commanded_capture_time in enumerate(times, 1):
-            camera.empty_event_queue()
-            with camera.backend.half_press_shutter_during():
-                shutter_speed = timedelta(seconds=camera.shutter.actual_value)
-            total_shot_time = shutter_speed + dark_time
-            buffer = total_shot_time - interval
-            logger.debug(
-                f"Required shot time: {format_timedelta(shutter_speed)} +"
-                f" {format_timedelta(dark_time)} = {format_timedelta(total_shot_time)}. This"
-                f" is {format_timedelta(buffer)} less than the interval"
+    camera_current_time = datetime.fromtimestamp(
+        camera.backend.get_config_value(config.config_map["current_time"])
+    )
+    computer_current_time = round(datetime.now().timestamp())
+
+    logger.info(
+        f"Computer's current time is {camera_current_time - camera_current_time} ahead of camera's"
+    )
+
+    camera.backend.set_config_value(config.config_map["current_time"], computer_current_time)
+    logger.info("Set camera time")
+    camera.backend.set_config_value(
+        config.config_map["auto_exposure_mode"].key,
+        config.config_map["auto_exposure_mode"].values[mode],
+    )
+    for i, commanded_capture_time in enumerate(times, 1):
+        shutter_speed = timedelta(seconds=camera.shutter.actual_value)
+        total_shot_time = shutter_speed + dark_time
+        buffer = interval - total_shot_time
+        logger.debug(
+            f"Required shot time: {format_timedelta(shutter_speed)} +"
+            f" {format_timedelta(dark_time)} = {format_timedelta(total_shot_time)}. This"
+            f" yields a {format_timedelta(buffer)} buffer vs. given interval {interval}"
+        )
+        now = datetime.now()
+        if commanded_capture_time < now:
+            raise ValueError(f"Missed capture window #{i} by {now - commanded_capture_time}")
+        sleep_until(commanded_capture_time)
+        if not dry_run:
+            start_time = time.perf_counter()
+            output_path, actual_capture_time = camera.capture(output_dir, stem=template.format(i=i))
+            logger.info(
+                f"Saved #{i} to PC at {output_path}. Delta:"
+                f" {actual_capture_time - commanded_capture_time}"
             )
-            now = datetime.now()
-            if commanded_capture_time < now:
-                raise ValueError(f"Missed capture window #{i} by {now - commanded_capture_time}")
-            sleep_until(commanded_capture_time)
-            if not dry_run:
-                start_time = time.perf_counter()
-                output_path, actual_capture_time = camera.capture_and_download(
-                    output_dir, stem=template.format(i=i)
-                )
-                logger.info(
-                    f"Saved #{i} to PC at {output_path}. Delta:"
-                    f" {actual_capture_time - commanded_capture_time}"
-                )
-                end_time = time.perf_counter()
-                actual_dark_time = timedelta(
-                    seconds=end_time - start_time - shutter_speed.total_seconds()
-                )
-                logger.debug(
-                    f"Actual dark time: {actual_dark_time} (vs. estimated dark time {dark_time})"
-                )
+            end_time = time.perf_counter()
+            actual_dark_time = timedelta(
+                seconds=end_time - start_time - shutter_speed.total_seconds()
+            )
+            logger.debug(
+                f"Actual dark time: {actual_dark_time} (vs. estimated dark time {dark_time})"
+            )

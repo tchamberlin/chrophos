@@ -1,10 +1,7 @@
 import IPython
 
-from chrophos.camera.backend import Backend
-from chrophos.camera.camera import open_camera
-from chrophos.config import CameraConfig
+from chrophos.camera.camera import Camera
 
 
-def shell(config: CameraConfig, backend: Backend):
-    with open_camera(backend=backend, config=config):
-        IPython.embed(header="HI")
+def shell(camera: Camera):
+    IPython.embed(header="HI")

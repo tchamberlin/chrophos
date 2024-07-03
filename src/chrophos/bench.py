@@ -6,8 +6,7 @@ from pathlib import Path
 import typer
 
 from chrophos.camera.backend import Backend
-from chrophos.camera.camera import open_camera
-from chrophos.config import CameraConfig
+from chrophos.camera.camera import Camera
 
 logger = logging.getLogger(__name__)
 
@@ -27,8 +26,7 @@ def print_stats(prefix: str, dark_times: list[float]):
 def bench_dark_time_for_shutter_speed(
     trials: int,
     shutter: str,
-    backend: Backend,
-    config: CameraConfig,
+    camera: Camera,
     output_dir: Path,
 ):
     """Benchmark the dark time at a given shutter speed
@@ -37,30 +35,27 @@ def bench_dark_time_for_shutter_speed(
     """
 
     dark_times = []
-    with open_camera(backend=backend, config=config) as camera:
-        logger.debug(f"Setting shutter to {shutter}")
-        camera.shutter.value = shutter
-        camera.backend.push_config()
-        camera.backend.pull_config()
-        logger.debug(f"Verify shutter: {camera.shutter.value}")
-        for i in range(1, trials + 1):
-            start_time = time.perf_counter()
-            output_path, actual_capture_time = camera.capture_and_download(output_dir, stem="bench")
-            end_time = time.perf_counter()
-            total_time = end_time - start_time
-            logger.debug(
-                f"It took {total_time:.2f}s to capture and download (with shutter {camera.shutter.value})"
-            )
-            dark_time = total_time - camera.shutter.actual_value
-            print(f"Trial #{i} dark time: {dark_time}")
-            dark_times.append(dark_time)
+    logger.debug(f"Setting shutter to {shutter}")
+    camera.shutter.value = shutter
+    camera.backend.push_config()
+    camera.backend.pull_config()
+    logger.debug(f"Verify shutter: {camera.shutter.value}")
+    for i in range(1, trials + 1):
+        start_time = time.perf_counter()
+        camera.capture(output_dir, stem="bench")
+        end_time = time.perf_counter()
+        total_time = end_time - start_time
+        logger.debug(
+            f"It took {total_time:.2f}s to capture and download (with shutter {camera.shutter.value})"
+        )
+        dark_time = total_time - camera.shutter.actual_value
+        print(f"Trial #{i} dark time: {dark_time}")
+        dark_times.append(dark_time)
 
     return dark_times
 
 
-def bench_sustained_capture_rate(
-    trials: int, shutter: str, backend: Backend, config: CameraConfig, output_dir: Path
-):
+def bench_sustained_capture_rate(trials: int, shutter: str, backend: Backend, output_dir: Path):
     """Capture images as quickly as possible; see how long it takes
 
     Capture will end after ONE OF:
@@ -74,17 +69,17 @@ def bench_sustained_capture_rate(
 def bench(
     trials: int,
     shutters: list[str],
-    backend: Backend,
-    config: CameraConfig,
+    mode: str,
+    camera: Camera,
     output_dir: Path,
 ):
+    camera.set_config_value("auto_exposure_mode", mode)
     dark_times_per_shutter: dict[str, list[float]] = {}
     for shutter in shutters:
         dark_times_per_shutter[shutter] = bench_dark_time_for_shutter_speed(
             trials=trials,
             shutter=shutter,
-            backend=backend,
-            config=config,
+            camera=camera,
             output_dir=output_dir,
         )
 

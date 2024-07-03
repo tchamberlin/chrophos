@@ -1,6 +1,9 @@
+import logging
 from abc import abstractmethod
 from numbers import Number
-from typing import Any
+from typing import Any, Callable
+
+logger = logging.getLogger("chrophos")
 
 
 class ValidationError(ValueError):
@@ -8,11 +11,14 @@ class ValidationError(ValueError):
 
 
 class Parameter:
-    def __init__(self, name: str, field: str, initial_value: Any = None):
+    def __init__(
+        self, name: str, field: str, initial_value: Any = None, setter: Callable | None = None
+    ):
         self.name = name
         self.field = field
         self._value = initial_value
         self.validate()
+        self.setter = setter
 
     def __str__(self):
         return f"{self.name}: {self.value}"
@@ -27,8 +33,13 @@ class Parameter:
 
     @value.setter
     def value(self, value):
+        original_value = self._value
         self._value = value
         self.validate()
+        if self.setter:
+            logger.warning(f"Calling setter function {self.setter.__name__}({self.field}, {value})")
+            self.setter(params=[self])
+            logger.debug(f"Changed {self.name} ({self.field}) from {original_value} to {value}")
 
     @abstractmethod
     def parse(self, value: str):
