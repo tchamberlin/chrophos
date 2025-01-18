@@ -64,22 +64,34 @@ class Gphoto2Backend(Backend):
         camera_name: Union[str, None] = None,
         reset_camera_config_on_exit=False,
     ):
+        self._camera = self.init_camera(name=camera_name)
+
+    def find_camera_address(self, name) -> str:
         try:
-            self._camera = gp.Camera()
+            camera = gp.Camera()
         except gp.GPhoto2Error as error:
             raise BackendError(
                 "Failed to initialize camera. Are you sure it's plugged in and turned on?"
             ) from error
 
-        cameras = dict(gp.Camera.autodetect())
+        if not name:
+            camera.init()
+            return camera
+
+        available_cameras = dict(gp.Camera.autodetect())
         try:
-            address = cameras[camera_name]
+            path = available_cameras[name]
         except KeyError as error:
             raise ValueError(
-                f"Requested camera_name {camera_name} is unavailable. Options are: {cameras}"
+                f"Requested camera_name {name} is unavailable. Options are: {available_cameras}"
             ) from error
-        self._camera.set_port_info(address)
-        self._camera.init()
+
+        port_info_list = gp.PortInfoList()
+        port_info_list.load()
+        index = port_info_list.lookup_path(path)
+        camera.set_port_info(port_info_list[index])
+        camera.init()
+        return camera
 
     @property
     def config(self):
