@@ -112,7 +112,7 @@ def main(
     dry_run: Annotated[bool, typer.Option("-D", "--dry-run")] = False,
 ):
     state["config"] = CameraConfig.read(config_path)
-    state["backend"] = Gphoto2Backend()
+    state["backend"] = Gphoto2Backend(camera_name=state["config"].camera_model)
     state["camera"] = Camera(backend=state["backend"], config=state["config"])
     state["dry_run"] = dry_run
     init_logging(verbosity)

@@ -61,6 +61,7 @@ class Backend(ABC):
 class Gphoto2Backend(Backend):
     def __init__(
         self,
+        camera_name: Union[str, None] = None,
         reset_camera_config_on_exit=False,
     ):
         try:
@@ -69,6 +70,16 @@ class Gphoto2Backend(Backend):
             raise BackendError(
                 "Failed to initialize camera. Are you sure it's plugged in and turned on?"
             ) from error
+
+        cameras = dict(gp.Camera.autodetect())
+        try:
+            address = cameras[camera_name]
+        except KeyError as error:
+            raise ValueError(
+                f"Requested camera_name {camera_name} is unavailable. Options are: {cameras}"
+            ) from error
+        self._camera.set_port_info(address)
+        self._camera.init()
 
     @property
     def config(self):
