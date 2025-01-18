@@ -95,20 +95,17 @@ def timelapse(
     start = datetime.now() + start_delay
     times = gen_times(interval, num_frames, start)
     template = "TL{i}"
-    breakpoint()
-    camera.shutt
     camera_current_time = datetime.fromtimestamp(
-        camera.backend.get_config_value(config.config_map["current_time"])
+        camera.backend.get_config_value(config.parameters["datetime"].config_key)
     )
-    computer_current_time = round(datetime.now().timestamp())
+    computer_current_time = datetime.now().timestamp()
 
     logger.info(
         f"Computer's current time is {camera_current_time - camera_current_time} ahead of camera's"
     )
 
-    camera.set_config_value(config.parameters["datetime"])
     camera.backend.set_config_value(
-        config.config_map["current_time"], computer_current_time
+        config.parameters["datetime"].config_key, computer_current_time
     )
     logger.info("Set camera time")
     # camera.backend.set_config_value(
