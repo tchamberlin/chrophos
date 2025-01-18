@@ -105,7 +105,7 @@ def timelapse(
     )
 
     camera.backend.set_config_value(
-        config.parameters["datetime"].config_key, computer_current_time
+        config.parameters["datetime"].config_key, round(computer_current_time)
     )
     logger.info("Set camera time")
     # camera.backend.set_config_value(
