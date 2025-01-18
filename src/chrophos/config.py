@@ -66,7 +66,11 @@ def _parse_config(config: Union[dict, tomlkit.TOMLDocument]):
             parameters[parameter_name] = parameter_class(name=parameter_name, **parameter_config)
         except TypeError as error:
             raise ConfigFileError(f"Invalid: {error}") from error
-    return {"camera_model": config["camera_model"], "parameters": parameters}
+    return {
+        "camera_model": config["camera_model"],
+        "dark_time": config["dark_time"],
+        "parameters": parameters,
+    }
 
 
 def parse_config(path: Path):
