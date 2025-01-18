@@ -38,6 +38,7 @@ PARAMETER_MAP: dict[str, Type] = {
     "discrete": DiscreteConfigParameter,
     "range": RangeConfigParameter,
     "boolean": BooleanConfigParameter,
+    "datetime": ConfigParameter,
 }
 
 
@@ -66,7 +67,9 @@ def _parse_config(config: Union[dict, tomlkit.TOMLDocument]):
         parameter_type = parameter_config["type"]
         parameter_class = PARAMETER_MAP[parameter_type]
         try:
-            parameters[parameter_name] = parameter_class(name=parameter_name, **parameter_config)
+            parameters[parameter_name] = parameter_class(
+                name=parameter_name, **parameter_config
+            )
         except TypeError as error:
             raise ConfigFileError(f"Invalid: {error}") from error
     return {
