@@ -65,7 +65,9 @@ def bench(
     trials: int,
     shutters: list[str],
     mode: Annotated[str, typer.Option("-m", "--mode")],
-    output_dir: Annotated[Path, typer.Option("-o", "--output")] = Path("./raw_bench_images"),
+    output_dir: Annotated[Path, typer.Option("-o", "--output")] = Path(
+        "./raw_bench_images"
+    ),
 ):
     chrophos.bench.bench(
         trials=trials,
@@ -94,7 +96,9 @@ def timelapse(
     mode: Annotated[str, typer.Option("-m", "--mode")],
     num_frames: Optional[int] = None,
     dark_time: Optional[float] = 3.0,
-    output_dir: Annotated[Path, typer.Option("-o", "--output")] = Path("./raw_timelapse_images"),
+    output_dir: Annotated[Path, typer.Option("-o", "--output")] = Path(
+        "./raw_timelapse_images"
+    ),
 ):
     chrophos.timelapse.timelapse(
         camera=state["camera"],
@@ -113,11 +117,11 @@ def main(
     verbosity: Annotated[int, typer.Option("-v")] = 1,
     dry_run: Annotated[bool, typer.Option("-D", "--dry-run")] = False,
 ):
+    init_logging(verbosity)
     state["config"] = CameraConfig.read(config_path)
     state["backend"] = Gphoto2Backend(camera_name=state["config"].camera_model)
     state["camera"] = Camera(backend=state["backend"], config=state["config"])
     state["dry_run"] = dry_run
-    init_logging(verbosity)
 
 
 if __name__ == "__main__":
