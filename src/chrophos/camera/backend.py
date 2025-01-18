@@ -58,6 +58,10 @@ class Backend(ABC):
     def set_config_value(self, key: str, value, **kwargs):
         ...
 
+    @abstractmethod
+    def gen_parameter(self, config_param: ConfigParameter) -> Parameter:
+        ...
+
 
 class Gphoto2Backend(Backend):
     def __init__(
