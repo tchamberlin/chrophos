@@ -43,7 +43,6 @@ PARAMETER_MAP: dict[str, Type] = {
 
 class CameraConfig(BaseModel):
     camera_model: str
-    dark_time: float
     parameters: dict[str, ConfigParameter]
 
     @staticmethod
@@ -51,7 +50,6 @@ class CameraConfig(BaseModel):
         config = parse_config(path)
         return CameraConfig(
             camera_model=config["camera_model"],
-            dark_time=config["dark_time"],
             parameters=config["parameters"],
         )
 
