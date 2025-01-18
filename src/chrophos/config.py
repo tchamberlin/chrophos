@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Any, Type
+from typing import Any, List, Type, Union
 
 import tomlkit
 from pydantic import BaseModel
@@ -14,14 +14,14 @@ class ConfigParameter(BaseModel):
     name: str
     config_key: str
     read_only: bool = False
-    initial_value: str | float | int | None = None
+    initial_value: Union[str, float, None] = None
     target: Any | None = None
 
 
 class DiscreteConfigParameter(ConfigParameter):
-    valid_min: int | float | str | None = None
-    valid_max: int | float | str | None = None
-    valid_choices: list[int | float | str] | None = None
+    valid_min: Union[str, float, None] = None
+    valid_max: Union[str, float, None] = None
+    valid_choices: List[Union[float, str]] | None = None
 
 
 class BooleanConfigParameter(ConfigParameter):
@@ -30,8 +30,8 @@ class BooleanConfigParameter(ConfigParameter):
 
 
 class RangeConfigParameter(ConfigParameter):
-    valid_min: int | float | str | None = None
-    valid_max: int | float | str | None = None
+    valid_min: Union[str, float, None] = None
+    valid_max: Union[str, float, None] = None
 
 
 PARAMETER_MAP: dict[str, Type] = {
