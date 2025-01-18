@@ -93,11 +93,13 @@ def timelapse(
     interval: int,
     mode: Annotated[str, typer.Option("-m", "--mode")],
     num_frames: Optional[int] = None,
+    dark_time: Optional[float] = 3.0,
     output_dir: Annotated[Path, typer.Option("-o", "--output")] = Path("./raw_timelapse_images"),
 ):
     chrophos.timelapse.timelapse(
         camera=state["camera"],
         mode=mode,
+        dark_time=timedelta(seconds=dark_time) if dark_time else None,
         num_frames=num_frames,
         interval=timedelta(seconds=interval),
         output_dir=output_dir,
