@@ -65,6 +65,7 @@ class Camera:
         self.config = config
 
         self.parameters = {}
+        breakpoint()
         # TODO: This doesn't belong here
         for config_param in config.parameters.values():
             # camera_config_item = self.config.parameters[config_param.name]
