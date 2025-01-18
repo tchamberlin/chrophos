@@ -69,7 +69,8 @@ class DateTimeParameter(Parameter):
         return f"{self.name}: {self.value}"
 
     def parse(self, value: str):
-        return datetime.fromtimestamp(float(value))
+        return float(value)
+        # return datetime.fromtimestamp(float(value))
 
     def validate(self):
         pass
