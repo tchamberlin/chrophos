@@ -136,6 +136,9 @@ class Camera:
 
         return self.backend.capture_and_download(output_dir=output_dir, stem=stem)
 
+    def set_config_value(self, key: str, value, **kwargs):
+        return self.backend.set_config_value(key=key, value=value, **kwargs)
+
 
 # TODO: Should this exist?
 @contextmanager

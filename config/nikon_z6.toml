@@ -52,3 +52,7 @@ config_key = "expprogram"
 type = "discrete"
 config_key = "evstep"
 initial_value = "1/3"
+
+[parameters.datetime]
+type = "discrete"
+config_key = "datetime"

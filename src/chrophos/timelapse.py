@@ -93,6 +93,7 @@ def timelapse(
     start = datetime.now() + start_delay
     times = gen_times(interval, num_frames, start)
     template = "TL{i}"
+    breakpoint()
     camera_current_time = datetime.fromtimestamp(
         camera.backend.get_config_value(config.config_map["current_time"])
     )
@@ -102,12 +103,13 @@ def timelapse(
         f"Computer's current time is {camera_current_time - camera_current_time} ahead of camera's"
     )
 
+    camera.set_config_value(config.parameters["datetime"])
     camera.backend.set_config_value(config.config_map["current_time"], computer_current_time)
     logger.info("Set camera time")
-    camera.backend.set_config_value(
-        config.config_map["auto_exposure_mode"].key,
-        config.config_map["auto_exposure_mode"].values[mode],
-    )
+    # camera.backend.set_config_value(
+    #     config.config_map["auto_exposure_mode"].key,
+    #     config.config_map["auto_exposure_mode"].values[mode],
+    # )
     for i, commanded_capture_time in enumerate(times, 1):
         shutter_speed = timedelta(seconds=camera.shutter.actual_value)
         total_shot_time = shutter_speed + dark_time
