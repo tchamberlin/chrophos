@@ -74,7 +74,9 @@ def timelapse(
     overwrite=False,
 ):
     if not overwrite and output_dir.is_dir() and any(output_dir.iterdir()):
-        raise ValueError(f"Given output directory {output_dir} already exists and is non-empty!")
+        raise ValueError(
+            f"Given output directory {output_dir} already exists and is non-empty!"
+        )
     config = camera.config
     backend = camera.backend
     if dark_time is None:
@@ -94,6 +96,7 @@ def timelapse(
     times = gen_times(interval, num_frames, start)
     template = "TL{i}"
     breakpoint()
+    camera.shutt
     camera_current_time = datetime.fromtimestamp(
         camera.backend.get_config_value(config.config_map["current_time"])
     )
@@ -104,7 +107,9 @@ def timelapse(
     )
 
     camera.set_config_value(config.parameters["datetime"])
-    camera.backend.set_config_value(config.config_map["current_time"], computer_current_time)
+    camera.backend.set_config_value(
+        config.config_map["current_time"], computer_current_time
+    )
     logger.info("Set camera time")
     # camera.backend.set_config_value(
     #     config.config_map["auto_exposure_mode"].key,
@@ -121,11 +126,15 @@ def timelapse(
         )
         now = datetime.now()
         if commanded_capture_time < now:
-            raise ValueError(f"Missed capture window #{i} by {now - commanded_capture_time}")
+            raise ValueError(
+                f"Missed capture window #{i} by {now - commanded_capture_time}"
+            )
         sleep_until(commanded_capture_time)
         if not dry_run:
             start_time = time.perf_counter()
-            output_path, actual_capture_time = camera.capture(output_dir, stem=template.format(i=i))
+            output_path, actual_capture_time = camera.capture(
+                output_dir, stem=template.format(i=i)
+            )
             logger.info(
                 f"Saved #{i} to PC at {output_path}. Delta:"
                 f" {actual_capture_time - commanded_capture_time}"

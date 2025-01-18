@@ -1,5 +1,6 @@
 import logging
 from abc import ABC, abstractmethod
+from datetime import datetime
 from numbers import Number
 from typing import Any, Callable, Union
 
@@ -50,19 +51,36 @@ class Parameter(ABC):
         self._value = value
         self.validate()
         if self.setter:
-            logger.info(f"Calling setter function {self.setter.__name__}({self.field}, {value})")
+            logger.info(
+                f"Calling setter function {self.setter.__name__}({self.field}, {value})"
+            )
             self.setter(params=[self])
-            logger.debug(f"Changed {self.name} ({self.field}) from {original_value} to {value}")
+            logger.debug(
+                f"Changed {self.name} ({self.field}) from {original_value} to {value}"
+            )
 
     @abstractmethod
     def parse(self, value: str) -> Any:
         ...
 
 
+class DateTimeParameter(Parameter):
+    def __repr__(self):
+        return f"{self.name}: {self.value}"
+
+    def parse(self, value: str):
+        return datetime.fromtimestamp(float(value))
+
+    def validate(self):
+        pass
+
+
 class RangeParameter(Parameter):
     """INCLUSIVE"""
 
-    def __init__(self, name: str, field: str, valid_range: tuple[Number, Number], *args, **kwargs):
+    def __init__(
+        self, name: str, field: str, valid_range: tuple[Number, Number], *args, **kwargs
+    ):
         self.valid_range = valid_range
         self.lower_bound, self.upper_bound = valid_range
         super().__init__(*args, name=name, field=field, **kwargs)
@@ -125,7 +143,9 @@ class DiscreteParameter(Parameter):
             )
             initial_value = self.choices[0]
 
-        super().__init__(*args, name=name, field=field, initial_value=initial_value, **kwargs)
+        super().__init__(
+            *args, name=name, field=field, initial_value=initial_value, **kwargs
+        )
 
     def __repr__(self):
         if len(self.choices) > 3:

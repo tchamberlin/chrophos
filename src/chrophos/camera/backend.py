@@ -13,6 +13,7 @@ from chrophos.config import ConfigParameter, parse_config_raw
 from ..utilities.benchmark import Benchmark
 from .parameter import (
     Aperture,
+    DateTimeParameter,
     DiscreteParameter,
     EvStep,
     Iso,
@@ -150,6 +151,12 @@ class Gphoto2Backend(Backend):
                 valid_range=(lower, upper),
                 setter=self.push_config,
             )
+        elif config_param.type == "datetime":
+            parameter = DateTimeParameter(
+                name=config_param.name,
+                field=config_param.config_key,
+                setter=self.push_config,
+            )
         else:
             raise ValueError(f"Invalid type: {config_param.type}")
 
@@ -257,7 +264,9 @@ class Gphoto2Backend(Backend):
             else:
                 stem = path_on_camera.name
             output_path = output_dir / f"{stem}{path_on_camera.suffix}"
-            with Benchmark(f"Saved image from camera to {output_path}", logger=logger.debug):
+            with Benchmark(
+                f"Saved image from camera to {output_path}", logger=logger.debug
+            ):
                 camera_file.save(str(output_path))
             logger.info(f"Capture to {output_path} completed at {capture_dt}")
         else:
@@ -274,9 +283,7 @@ class Gphoto2Backend(Backend):
 
     def summary(self):
         self.pull_config()
-        return (
-            f"Shutter: {self.shutter.value}; Aperture: {self.aperture.value}; ISO: {self.iso.value}"
-        )
+        return f"Shutter: {self.shutter.value}; Aperture: {self.aperture.value}; ISO: {self.iso.value}"
 
     def empty_event_queue(self, timeout=10):
         while True:
