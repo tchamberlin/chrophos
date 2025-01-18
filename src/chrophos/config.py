@@ -43,12 +43,17 @@ PARAMETER_MAP: dict[str, Type] = {
 
 class CameraConfig(BaseModel):
     camera_model: str
+    dark_time: float
     parameters: dict[str, ConfigParameter]
 
     @staticmethod
     def read(path: Path):
         config = parse_config(path)
-        return CameraConfig(camera_model=config["camera_model"], parameters=config["parameters"])
+        return CameraConfig(
+            camera_model=config["camera_model"],
+            dark_time=config["dark_time"],
+            parameters=config["parameters"],
+        )
 
 
 def parse_config_raw(path: Path):
