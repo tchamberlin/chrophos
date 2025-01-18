@@ -90,8 +90,8 @@ class DiscreteParameter(Parameter):
         field: str,
         initial_value: Any,
         choices: list[Any],
-        valid_min: int | float | None = None,
-        valid_max: int | float | None = None,
+        valid_min: Union[int, float, None] = None,
+        valid_max: Union[int, float, None] = None,
         *args,
         **kwargs,
     ):
