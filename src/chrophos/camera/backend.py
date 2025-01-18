@@ -66,7 +66,7 @@ class Gphoto2Backend(Backend):
     ):
         self._camera = self.init_camera(name=camera_name)
 
-    def find_camera_address(self, name) -> str:
+    def init_camera(self, name) -> str:
         try:
             camera = gp.Camera()
         except gp.GPhoto2Error as error:
