@@ -28,8 +28,8 @@ class Parameter(ABC):
         self.validate()
         self.setter = setter
         self.read_only = read_only
-        if self.setter:
-            self.setter(params=[self])
+        # if self.setter:
+        #     self.setter(params=[self])
 
     def __repr__(self):
         return f"{self.name}: {self.value}"
