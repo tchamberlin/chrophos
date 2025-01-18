@@ -15,13 +15,13 @@ class ConfigParameter(BaseModel):
     config_key: str
     read_only: bool = False
     initial_value: Union[str, float, None] = None
-    target: Any | None = None
+    target: Union[Any, None] = None
 
 
 class DiscreteConfigParameter(ConfigParameter):
     valid_min: Union[str, float, None] = None
     valid_max: Union[str, float, None] = None
-    valid_choices: List[Union[float, str]] | None = None
+    valid_choices: Union[List[Union[float, str]], None] = None
 
 
 class BooleanConfigParameter(ConfigParameter):
@@ -57,7 +57,7 @@ def parse_config_raw(path: Path):
         return tomlkit.load(file)
 
 
-def _parse_config(config: dict | tomlkit.TOMLDocument):
+def _parse_config(config: Union[dict, tomlkit.TOMLDocument]):
     parameters: dict[str, ConfigParameter] = {}
     for parameter_name, parameter_config in config["parameters"].items():
         parameter_type = parameter_config["type"]
