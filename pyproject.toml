@@ -20,14 +20,8 @@ license = {text = "GPLv3"}
 [project.optional-dependencies]
 raw = ["rawpy>=0.18"]
 
-[project.scripts]
-chrophos = "chrophos.cli:app"
 
-[build-system]
-requires = ["pdm-backend"]
-build-backend = "pdm.backend"
-
-[tool.pdm.dev-dependencies]
+[dependency-groups]
 image = [
     "scikit-image>=0.21.0",
 ]
@@ -38,6 +32,12 @@ dev = [
     "notebook>=7.0.2",
 ]
 
+[project.scripts]
+chrophos = "chrophos.cli:app"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
 
 [tool.ruff]
