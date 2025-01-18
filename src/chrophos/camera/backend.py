@@ -4,50 +4,24 @@ from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
 from time import sleep
-from typing import Union
+from typing import Any, Union
 
 import gphoto2 as gp
 
-from ..config import Complex
+from chrophos.config import ConfigParameter, parse_config_raw
+
 from ..utilities.benchmark import Benchmark
-from .parameter import DiscreteParameter, Parameter, ReadonlyParameter, ValidationError
+from .parameter import (
+    Aperture,
+    DiscreteParameter,
+    EvStep,
+    Iso,
+    Parameter,
+    RangeParameter,
+    Shutter,
+)
 
 logger = logging.getLogger("chrophos")
-
-
-class Aperture(DiscreteParameter):
-    def parse(self, aperture: str):
-        try:
-            return float(aperture)
-        except ValueError:
-            pass
-
-        try:
-            return float(aperture.split("/")[1])
-        except IndexError as error:
-            raise ValidationError(f"Invalid aperture: {aperture!r}") from error
-
-
-class Shutter(DiscreteParameter):
-    def parse(self, shutter: str):
-        try:
-            return float(shutter)
-        except ValueError:
-            pass
-
-        try:
-            numerator, denominator = shutter.split("/")
-            return float(numerator) / float(denominator)
-        except (ValueError, IndexError) as error:
-            raise ValidationError(f"Invalid shutter value {shutter!r}") from error
-
-
-class Iso(DiscreteParameter):
-    def parse(self, value: str):
-        try:
-            return int(value)
-        except ValueError as error:
-            raise ValidationError(f"Invalid iso value {value!r}") from error
 
 
 class BackendError(ValueError):
@@ -57,18 +31,9 @@ class BackendError(ValueError):
 class Backend(ABC):
     """An abstraction of a physical camera."""
 
-    aperture: Aperture
-    iso: Iso
-    shutter: Shutter
-    light_meter: Union[ReadonlyParameter, None]
-
-    @abstractmethod
-    def __init__(self, config_map: dict[str, str]):
-        ...
-
     @abstractmethod
     def capture_and_download(
-        self, output_dir: Path | None = None, stem: str | None = None
+        self, output_dir: Union[Path, None] = None, stem: Union[str, None] = None
     ) -> tuple[Path, datetime]:
         ...
 
@@ -76,14 +41,26 @@ class Backend(ABC):
     def exit(self):
         ...
 
+    @abstractmethod
+    def push_config(self, params: Union[list[Parameter], None] = None, **kwargs):
+        ...
+
+    @abstractmethod
+    def pull_config(self, params: Union[list[Parameter], None] = None, **kwargs):
+        ...
+
+    @abstractmethod
+    def get_config_value(self, key: str, **kwargs) -> Any:
+        ...
+
+    @abstractmethod
+    def set_config_value(self, key: str, value, **kwargs):
+        ...
+
 
 class Gphoto2Backend(Backend):
     def __init__(
         self,
-        config_map: dict[str, Union[str, Complex]],
-        target_shutter: float,
-        target_aperture: float,
-        target_iso: int,
         reset_camera_config_on_exit=False,
     ):
         try:
@@ -92,70 +69,6 @@ class Gphoto2Backend(Backend):
             raise BackendError(
                 "Failed to initialize camera. Are you sure it's plugged in and turned on?"
             ) from error
-
-        self.target_shutter = target_shutter
-
-        self.target_aperture = target_aperture
-        self.target_iso = target_iso
-        self.pre_init_camera()
-        camera_config = self._camera.get_config()
-
-        self.initial_camera_config = camera_config
-        self.reset_camera_config_on_exit = reset_camera_config_on_exit
-
-        shutter = camera_config.get_child_by_name(config_map["shutter"])
-        self.parameters = {}
-        self.shutter = Shutter(
-            "shutter",
-            config_map["shutter"],
-            choices=list(shutter.get_choices()),
-            initial_value=shutter.get_value(),
-            setter=self.push_config,
-        )
-        self.parameters["shutter"] = self.shutter
-
-        aperture = camera_config.get_child_by_name(config_map["aperture"])
-        self.aperture = Aperture(
-            "aperture",
-            config_map["aperture"],
-            choices=list(aperture.get_choices()),
-            initial_value=aperture.get_value(),
-            setter=self.push_config,
-        )
-        self.parameters["aperture"] = self.aperture
-
-        iso = camera_config.get_child_by_name("iso")
-        self.iso = Iso(
-            "iso",
-            config_map["iso"],
-            # TODO: Don't reverse this; need to properly sort!
-            choices=list(iso.get_choices()),
-            initial_value=iso.get_value(),
-        )
-        self.parameters["iso"] = self.iso
-        if "light_meter" in config_map:
-            light_meter = camera_config.get_child_by_name("lightmeter")
-            self.light_meter = ReadonlyParameter(
-                "light_meter", "lightmeter", initial_value=light_meter.get_value()
-            )
-            self.parameters["light_meter"] = self.light_meter
-        else:
-            self.light_meter = None
-
-        auto_exposure_mode = camera_config.get_child_by_name(config_map["auto_exposure_mode"].key)
-        self.auto_exposure_mode = DiscreteParameter(
-            "auto_exposure_mode",
-            config_map["auto_exposure_mode"].key,
-            choices=list(auto_exposure_mode.get_choices()),
-            initial_value=auto_exposure_mode.get_value(),
-        )
-        self.parameters["auto_exposure_mode"] = self.auto_exposure_mode
-        # Push config to camera
-        self.push_config()
-        # Perform any post-init tasks that need to be performed
-        self.post_init_camera()
-        # Pull the config from the camera, in case things changed as a result of post_init_camera
-        self.pull_config()
 
     @property
     def config(self):
@@ -170,12 +83,67 @@ class Gphoto2Backend(Backend):
     def post_init_camera(self):
         pass
 
+    def gen_parameter(self, config_param: ConfigParameter):
+        """Given a ConfigParameter, generate a Parameter (which knows how to talk to this backend)"""
+        backend_config_item = self.get_config_item(config_param.config_key)
+        current_value = backend_config_item.get_value()
+        if config_param.type == "discrete":
+            possible_choices = list(backend_config_item.get_choices())
+            if config_param.name == "shutter":
+                parameter_class = Shutter
+            elif config_param.name == "aperture":
+                parameter_class = Aperture
+            elif config_param.name == "iso":
+                parameter_class = Iso
+            elif config_param.name == "ev_step_size":
+                parameter_class = EvStep
+            else:
+                parameter_class = DiscreteParameter
+
+            parameter = parameter_class(
+                name=config_param.name,
+                field=config_param.config_key,
+                initial_value=config_param.initial_value or current_value,
+                valid_min=config_param.valid_min,
+                valid_max=config_param.valid_max,
+                choices=possible_choices,
+                setter=self.push_config,
+            )
+        elif config_param.type == "boolean":
+            possible_choices = list(backend_config_item.get_choices())
+            parameter = DiscreteParameter(
+                name=config_param.name,
+                field=config_param.config_key,
+                initial_value=config_param.initial_value or current_value,
+                choices=possible_choices,
+                setter=self.push_config,
+            )
+        elif config_param.type == "range":
+            lower, upper, step = backend_config_item.get_range()  # ?
+            parameter = RangeParameter(
+                name=config_param.name,
+                field=config_param.config_key,
+                initial_value=config_param.initial_value or current_value,
+                valid_range=(lower, upper),
+                setter=self.push_config,
+            )
+        else:
+            raise ValueError(f"Invalid type: {config_param.type}")
+
+        return parameter
+
     def get_config_value(self, key, attempts=2):
+        item = self.get_config_item(key, attempts=attempts)
+        if not item:
+            raise ValueError("hmmm")
+        return item.get_value()
+
+    def get_config_item(self, key, attempts=2):
         for i in range(1, attempts + 1):
             logger.debug(f"Attempt #{i} to get {key}")
             try:
                 config = self._camera.get_config()
-                return config.get_child_by_name(key).get_value()
+                return config.get_child_by_name(key)
             except gp.GPhoto2Error as error:
                 if i == attempts:
                     raise
@@ -199,9 +167,15 @@ class Gphoto2Backend(Backend):
         camera_config = self._camera.get_config()
         for p in self.parameters.values():
             p.value = camera_config.get_child_by_name(p.field).get_value()
+            logger.debug(f"Set {p.name} to {p.value}")
         logger.debug("Pulled config from camera")
 
-    def push_config(self, bulk=False, params: Union[list[Parameter], None] = None, attempts=2):
+    def push_config(
+        self,
+        params: Union[list[Parameter], None] = None,
+        attempts=2,
+        bulk=False,
+    ):
         if params is None:
             params = self.parameters.values()
         else:
@@ -227,16 +201,25 @@ class Gphoto2Backend(Backend):
         logger.debug("Pushed config to camera")
 
     def capture_and_download(
-        self, output_dir: Path | None = None, stem: str | None = None, timeout=3_000
+        self,
+        output_dir: Union[Path, None] = None,
+        stem: Union[str, None] = None,
+        timeout=3_000,
+        method="wait_for_event",
     ):
         logger.debug("Start capture")
         with Benchmark("Captured image", logger=logger.debug):
             # This method seems slightly faster than the capture() method
-            self._camera.trigger_capture()
-            while True:
-                event_type, event_data = self._camera.wait_for_event(timeout)
-                if event_type == gp.GP_EVENT_FILE_ADDED:
-                    break
+            if method == "direct_capture":
+                event_data = self._camera.capture(gp.GP_CAPTURE_IMAGE)
+            if method == "wait_for_event":
+                self._camera.trigger_capture()
+                while True:
+                    event_type, event_data = self._camera.wait_for_event(timeout)
+                    if event_type == gp.GP_EVENT_FILE_ADDED:
+                        break
+            else:
+                raise ValueError(f"Unsupported capture method {method}")
         path_on_camera = Path(event_data.folder + event_data.name)
         logger.info(f"Captured to camera path {path_on_camera}")
         if output_dir:
@@ -333,63 +316,31 @@ class Canon5DII(Gphoto2Backend):
 
 
 class DummyBackend(Backend):
-    def __init__(
-        self,
-        config_map: dict[str, Union[str, Complex]],
-        target_shutter: float,
-        target_aperture: float,
-        target_iso: int,
-    ):
-        self.target_shutter = target_shutter
+    def __init__(self, config_path: Path):
+        self.config = parse_config_raw(config_path)
 
-        self.target_aperture = target_aperture
-        self.target_iso = target_iso
-        self.pre_init_camera()
+    # def gen_parameter()
 
-        self.parameters = {}
-        self.shutter = Shutter(
-            "shutter",
-            config_map["shutter"],
-            choices=["1/8000", "1/100", "1"],
-            initial_value="1/100",
-        )
-        self.parameters["shutter"] = self.shutter
-
-        self.aperture = Aperture(
-            "aperture",
-            config_map["aperture"],
-            choices=["2", "2.8", "4", "11"],
-            initial_value="2",
-        )
-        self.parameters["aperture"] = self.aperture
-
-        self.iso = Iso(
-            "iso",
-            config_map["iso"],
-            choices=["100", "1000", "12800"],
-            initial_value="100",
-        )
-        self.parameters["iso"] = self.iso
-
-        self.auto_exposure_mode = DiscreteParameter(
-            "auto_exposure_mode",
-            config_map["auto_exposure_mode"].key,
-            choices=["M", "P", "A", "S"],
-            initial_value="M",
-        )
-        self.parameters["auto_exposure_mode"] = self.auto_exposure_mode
-        # Push config to camera
-        self.push_config()
-        # Perform any post-init tasks that need to be performed
-        self.post_init_camera()
-        # Pull the config from the camera, in case things changed as a result of post_init_camera
-        self.pull_config()
-
-    def capture_and_download(self, output_dir: Path, stem: str) -> tuple[Path, datetime]:
-        ...
+    def capture_and_download(
+        self, output_dir: Union[Path, None] = None, stem: Union[str, None] = None
+    ) -> tuple[Path, datetime]:
+        return (Path("dummy"), datetime.now())
 
     def exit(self):
         ...
 
-    def empty_event_queue(camera):
+    def pull_config(self, params: Union[list[Parameter], None] = None, **kwargs):
         ...
+
+    def push_config(self, params: Union[list[Parameter], None] = None, **kwargs):
+        ...
+
+    def get_config_item(self, key: str, **kwargs):
+        return self.config["config"][key]["value"]
+
+    def get_config_value(self, key: str, **kwargs):
+        return self.get_config_item(key)["value"]
+
+    def set_config_value(self, key: str, value, **kwargs):
+        self.config["config"][key] = value
+        logger.info(f"Set {key} to {value}")

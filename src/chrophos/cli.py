@@ -5,15 +5,16 @@ from typing import Annotated, Optional
 
 import typer
 
+import chrophos.auto_expose
 import chrophos.bench
 import chrophos.plan
 import chrophos.query
 import chrophos.seq
 import chrophos.shell
 import chrophos.timelapse
-from chrophos.camera.backend import Canon5DII, Gphoto2Backend
+from chrophos.camera.backend import Gphoto2Backend
 from chrophos.camera.camera import Camera
-from chrophos.config import CameraConfig, parse_config
+from chrophos.config import CameraConfig
 
 app = typer.Typer()
 
@@ -55,22 +56,6 @@ def plan(
 
 
 @app.command()
-def seq(action: str, output_dir: Path):
-    config: CameraConfig = state["config"]
-    chrophos.seq.capture_sequence(
-        action=action,
-        output_dir=output_dir,
-        base_config=config,
-        backend=Canon5DII(
-            config_map=config.config_map,
-            target_aperture=config.target_aperture,
-            target_iso=config.target_iso,
-            target_shutter=config.target_shutter,
-        ),
-    )
-
-
-@app.command()
 def query():
     chrophos.query.main()
 
@@ -88,6 +73,13 @@ def bench(
         shutters=shutters,
         camera=state["camera"],
         output_dir=output_dir,
+    )
+
+
+@app.command()
+def auto_expose():
+    chrophos.auto_expose.auto_expose(
+        camera=state["camera"],
     )
 
 
@@ -119,14 +111,8 @@ def main(
     verbosity: Annotated[int, typer.Option("-v")] = 1,
     dry_run: Annotated[bool, typer.Option("-D", "--dry-run")] = False,
 ):
-    config = parse_config(config_path)
-    state["config"] = config
-    state["backend"] = Gphoto2Backend(
-        config_map=config.config_map,
-        target_aperture=config.target_aperture,
-        target_iso=config.target_iso,
-        target_shutter=config.target_shutter,
-    )
+    state["config"] = CameraConfig.read(config_path)
+    state["backend"] = Gphoto2Backend()
     state["camera"] = Camera(backend=state["backend"], config=state["config"])
     state["dry_run"] = dry_run
     init_logging(verbosity)

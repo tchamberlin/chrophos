@@ -1,69 +1,93 @@
-from dataclasses import dataclass
-from datetime import timedelta
 from pathlib import Path
-from typing import Any, Union
+from typing import Any, Type
 
 import tomlkit
+from pydantic import BaseModel
 
 
-class Aperture(float):
-    pass
+class ConfigFileError(ValueError):
+    ...
 
 
-class Shutter(str):
-    pass
+class ConfigParameter(BaseModel):
+    type: str
+    name: str
+    config_key: str
+    read_only: bool = False
+    initial_value: str | float | int | None = None
+    target: Any | None = None
 
 
-class Iso(int):
-    pass
+class DiscreteConfigParameter(ConfigParameter):
+    valid_min: int | float | str | None = None
+    valid_max: int | float | str | None = None
+    valid_choices: list[int | float | str] | None = None
 
 
-@dataclass
-class Complex:
-    key: str
-    values: dict[str, Any]
+class BooleanConfigParameter(ConfigParameter):
+    true: Any
+    false: Any
 
 
-@dataclass
-class CameraConfig:
-    target_iso: Iso
-    target_shutter: Shutter
-    target_aperture: Aperture
+class RangeConfigParameter(ConfigParameter):
+    valid_min: int | float | str | None = None
+    valid_max: int | float | str | None = None
 
-    shutter_min: Shutter
-    shutter_max: Shutter
-    aperture_min: Aperture
-    aperture_max: Aperture
-    iso_min: Iso
-    iso_max: Iso
-    config_map: dict[str, Union[str, Complex]]
-    dark_time: timedelta
+
+PARAMETER_MAP: dict[str, Type] = {
+    "discrete": DiscreteConfigParameter,
+    "range": RangeConfigParameter,
+    "boolean": BooleanConfigParameter,
+}
+
+
+class CameraConfig(BaseModel):
+    camera_model: str
+    parameters: dict[str, ConfigParameter]
+
+    @staticmethod
+    def read(path: Path):
+        config = parse_config(path)
+        return CameraConfig(camera_model=config["camera_model"], parameters=config["parameters"])
 
 
 def parse_config_raw(path: Path):
+    """Simply parse the config file as TOML"""
     with open(path, "rb") as file:
         return tomlkit.load(file)
 
 
-def parse_param(param: Union[str, dict[str, Any]]):
-    if isinstance(param, str):
-        return param
-
-    return Complex(key=param["key"], values=param["values"])
+def _parse_config(config: dict | tomlkit.TOMLDocument):
+    parameters: dict[str, ConfigParameter] = {}
+    for parameter_name, parameter_config in config["parameters"].items():
+        parameter_type = parameter_config["type"]
+        parameter_class = PARAMETER_MAP[parameter_type]
+        try:
+            parameters[parameter_name] = parameter_class(name=parameter_name, **parameter_config)
+        except TypeError as error:
+            raise ConfigFileError(f"Invalid: {error}") from error
+    return {"camera_model": config["camera_model"], "parameters": parameters}
 
 
 def parse_config(path: Path):
-    config = parse_config_raw(path)
-    return CameraConfig(
-        target_iso=config["target_iso"],
-        target_shutter=config["target_shutter"],
-        target_aperture=config["target_aperture"],
-        shutter_min=config["shutter_min"],
-        shutter_max=config["shutter_max"],
-        aperture_min=config["aperture_min"],
-        aperture_max=config["aperture_max"],
-        iso_min=config["iso_min"],
-        iso_max=config["iso_max"],
-        config_map={k: parse_param(v) for k, v in config["config_map"].items()},
-        dark_time=timedelta(seconds=config["dark_time"]),
-    )
+    """Fully parse and validate the config file at `path`"""
+    raw_config = parse_config_raw(path)
+    validate_config(raw_config)
+    return _parse_config(raw_config)
+
+
+def validate_config(config: dict):
+    for parameter_name, parameter_config in config["parameters"].items():
+        try:
+            parameter_type = parameter_config["type"]
+        except KeyError as error:
+            raise ConfigFileError(
+                f"[parameter.{parameter_name}] does not contain `type`"
+            ) from error
+
+        try:
+            PARAMETER_MAP[parameter_type]
+        except KeyError as error:
+            raise ConfigFileError(
+                f"{parameter_type=} is invalid! Valid choices are: {PARAMETER_MAP}"
+            ) from error
