@@ -65,12 +65,14 @@ class Camera:
         self.config = config
 
         self.parameters = {}
-        breakpoint()
         # TODO: This doesn't belong here
         for config_param in config.parameters.values():
             # camera_config_item = self.config.parameters[config_param.name]
             # backend_config_item = backend.get_config_item(config_param.config_key)
             parameter = backend.gen_parameter(config_param=config_param)
+            if config_param.name == "silent_capture":
+                breakpoint()
+
             if config_param.initial_value:
                 logger.debug(
                     f"Setting initial value for {config_param.name} ({config_param.config_key}) to {config_param.initial_value}"
