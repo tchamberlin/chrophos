@@ -57,9 +57,7 @@ class Camera:
     ):
         if not isinstance(config, CameraConfig):
             if not isinstance(config, Path):
-                logger.debug(
-                    f"Treating non-Path {config} of type {type(config)} as a path!"
-                )
+                logger.debug(f"Treating non-Path {config} of type {type(config)} as a path!")
             config = CameraConfig.read(config)
         self.backend = backend
         self.config = config
@@ -74,9 +72,7 @@ class Camera:
                 logger.debug(
                     f"Setting initial value for {config_param.name} ({config_param.config_key}) to {config_param.initial_value}"
                 )
-                self.backend.set_config_value(
-                    config_param.config_key, config_param.initial_value
-                )
+                self.backend.set_config_value(config_param.config_key, config_param.initial_value)
             setattr(self, parameter.name, parameter)
             # logger.debug(f"Init self.{key}")
             self.parameters[parameter.name] = parameter
@@ -85,7 +81,7 @@ class Camera:
     def step_exposure(self, num_stops: float):
         step_size = self.ev_step_size.actual_value
         if num_stops == 0:
-            raise CameraError("Can't step by 0, dumbass")
+            return
         total_steps = abs(int(num_stops // step_size))
         logger.info(
             f"Stepping exposure by {num_stops:.1f} stops (in {total_steps} steps of {self.ev_step_size.value} stops)"
@@ -102,15 +98,11 @@ class Camera:
             # the current parameter index and its maximum (length)
             if direction_to_step_towards > 0:
                 num_steps_we_can_change_this_param_by = (
-                    len(parameter.choices)
-                    - parameter.choices.index(parameter.value)
-                    - 1
+                    len(parameter.choices) - parameter.choices.index(parameter.value) - 1
                 )
             # We are decreasing, so our maximum number of steps is just the current index
             else:
-                num_steps_we_can_change_this_param_by = parameter.choices.index(
-                    parameter.value
-                )
+                num_steps_we_can_change_this_param_by = parameter.choices.index(parameter.value)
             if num_steps_we_can_change_this_param_by == 0:
                 logger.info(f"We cannot {direction_verb} {parameter.name} any more!")
                 continue
@@ -144,9 +136,7 @@ class Camera:
         )
         self.step_exposure(stops)
 
-    def capture(
-        self, output_dir: Union[Path, None] = None, stem: Union[str, None] = None
-    ):
+    def capture(self, output_dir: Union[Path, None] = None, stem: Union[str, None] = None):
         """Capture an image and save to to `output_dir` using `stem` as the basis for its name"""
 
         return self.backend.capture_and_download(output_dir=output_dir, stem=stem)
